@@ -76,10 +76,11 @@ export class InMemoryFlowStore implements FlowStore {
     return [...(this.logs.get(flowRunId) ?? [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
-  saveLog(flowRunId: string, log: FlowLog): void {
+  saveLog(flowRunId: string, log: FlowLog): Promise<void> {
     const items = this.logs.get(flowRunId) ?? [];
     items.push(log);
     this.logs.set(flowRunId, items);
+    return Promise.resolve();
   }
 
   listEvidence(flowRunId: string): EvidenceRecord[] {

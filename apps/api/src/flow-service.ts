@@ -108,7 +108,7 @@ export class FlowService {
         updatedAt: now,
       } satisfies WorkItem;
 
-    this.context.store.saveWorkItem(workItem);
+    await this.context.store.saveWorkItem(workItem);
 
     const flowRun: FlowRun = {
       id: randomUUID(),
@@ -129,7 +129,7 @@ export class FlowService {
       completedAt: null,
     };
 
-    this.context.store.saveFlow(flowRun);
+    await this.context.store.saveFlow(flowRun);
     this.log(flowRun.id, flowRun.currentStage, "info", "flow_created", `Created flow ${flowRun.id}`, {
       jiraKey: payload.jiraKey,
       triggerMode: payload.triggerMode,
@@ -807,6 +807,9 @@ export class FlowService {
       relatedObjectId: null,
       createdAt: nowIso(),
       redacted: true,
+    }).catch((err: unknown) => {
+      // Fire-and-forget: log failures must not crash the server
+      console.error("Failed to save flow log:", err);
     });
   }
 }

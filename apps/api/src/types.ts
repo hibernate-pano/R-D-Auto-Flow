@@ -86,7 +86,7 @@ export interface FlowStore {
   listStageRuns(flowRunId: string): StageRun[];
   saveStageRun(flowRunId: string, stageRun: StageRun): void;
   listLogs(flowRunId: string): FlowLog[];
-  saveLog(flowRunId: string, log: FlowLog): void;
+  saveLog(flowRunId: string, log: FlowLog): Promise<unknown>;
   listEvidence(flowRunId: string): EvidenceRecord[];
   saveEvidence(flowRunId: string, evidence: EvidenceRecord): void;
   listManualActions(flowRunId: string): Array<{

@@ -16,6 +16,8 @@ import {
 } from "./connectors/mock-connectors.js";
 import { FlowService } from "./flow-service.js";
 import { InMemoryFlowStore } from "./store/in-memory-store.js";
+import { PgFlowStore } from "./store/pg/pg-flow-store.js";
+import type { FlowStore } from "./types.js";
 
 function buildActorFromHeaders(headers: Record<string, unknown>) {
   const capabilities = String(headers["x-operator-capabilities"] ?? "")
@@ -38,10 +40,22 @@ function buildActorFromHeaders(headers: Record<string, unknown>) {
 export async function buildServer(cwd: string) {
   const { config, env, summary } = loadRuntimeConfig(cwd);
   const app = Fastify({ logger: true });
+
+  let store: InstanceType<typeof InMemoryFlowStore> | PgFlowStore;
+  if (env.DATABASE_URL.startsWith("postgres")) {
+    app.log.info({ databaseUrl: env.DATABASE_URL.replace(/\/\/[^@]+@/, "//***@") }, "using PostgreSQL store");
+    const pgStore = new PgFlowStore(env.DATABASE_URL);
+    await pgStore.init();
+    store = pgStore;
+  } else {
+    app.log.info("using in-memory store");
+    store = new InMemoryFlowStore();
+  }
+
   const service = new FlowService({
     config,
     env,
-    store: new InMemoryFlowStore(),
+    store: store as FlowStore,
     jira: new MockJiraConnector(config),
     confluence: new MockConfluenceConnector(),
     github: new MockGithubConnector(),
