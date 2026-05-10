@@ -1,8 +1,17 @@
-# API Contract：R&D Auto Flow MVP
+# API 契约：R&D Auto Flow MVP
+
+## Authority
+
+- Authority level: Derived interface contract, subordinate to canonical workflow rules
+- Primary upstream sources:
+  - `docs/canonical-workflow-spec.md`
+  - `docs/mvp-technical-design.md`
+- Usage rule: This document translates approved workflow behavior into interface shapes, payloads, and endpoint contracts.
+- Conflict rule: API behavior that conflicts with canonical workflow semantics must be corrected to match `docs/canonical-workflow-spec.md`.
 
 ## 1. 文档定位
 
-- 文档类型：后端 API Contract
+- 文档类型：后端 API 契约
 - 对应文档：
   - [canonical-workflow-spec.md](/Users/panbo/Code/Work-HSBC/R&D-Auto-Flow/docs/canonical-workflow-spec.md)
   - [rpd-jira-confluence-github-workflow.md](/Users/panbo/Code/Work-HSBC/R&D-Auto-Flow/docs/rpd-jira-confluence-github-workflow.md)
@@ -91,6 +100,8 @@ MVP 建议统一使用字符串 ID。
 ---
 
 ## 5. 枚举定义
+
+本节列出接口层必须接受或返回的稳定枚举。语义定义以上游 canonical 为准，这里只保留接口契约所需的词表快照。
 
 ## 5.1 Flow 总状态
 
@@ -804,7 +815,7 @@ MVP 仅要求前三个可用。
 
 - `implementation_note` 用于记录实现完成事实
 - `test_execution` 用于记录测试命令和结果
-- `manual_verification` 用于记录人工验证结论
+- `manual_verification` 用于记录人工验证结论；若未提供 `test_execution`，必须额外说明未执行自动化测试的原因、范围与风险
 - `approval_decision` 主要由审批动作驱动生成，不建议前端直接伪造
 - `final_writeback` 由系统在回写阶段写入
 
@@ -982,7 +993,7 @@ MVP 必须提供该接口。
 
 ## 19. 总结
 
-这份 API Contract 的重点不是接口数量，而是把以下边界定死：
+这份 API 契约的重点不是接口数量，而是把以下边界定死：
 
 1. Flow 的状态如何表达
 2. 前端如何拿到阶段和日志

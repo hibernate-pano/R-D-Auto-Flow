@@ -1,8 +1,18 @@
-# 数据库 Schema 草案：R&D Auto Flow MVP
+# 数据库表结构草案：R&D Auto Flow MVP
+
+## Authority
+
+- Authority level: Derived persistence draft, subordinate to canonical workflow rules
+- Primary upstream sources:
+  - `docs/canonical-workflow-spec.md`
+  - `docs/mvp-technical-design.md`
+  - `docs/api-contract.md`
+- Usage rule: This document proposes storage structures that implement already-decided workflow behavior.
+- Conflict rule: If field semantics or table behavior conflicts with canonical workflow rules, canonical wins and this draft must be adjusted.
 
 ## 1. 文档定位
 
-- 文档类型：数据库 Schema 草案
+- 文档类型：数据库表结构草案
 - 对应文档：
   - [canonical-workflow-spec.md](/Users/panbo/Code/Work-HSBC/R&D-Auto-Flow/docs/canonical-workflow-spec.md)
   - [mvp-technical-design.md](/Users/panbo/Code/Work-HSBC/R&D-Auto-Flow/docs/mvp-technical-design.md)
@@ -50,6 +60,8 @@ MVP 推荐数据库：
 ---
 
 ## 4. 枚举约定
+
+这些枚举是持久化层对 canonical 词表的落库镜像，不是新的规范定义。若 canonical 变更，应先改 canonical，再同步本节。
 
 ## 4.1 flow_overall_status
 
@@ -161,8 +173,8 @@ MVP 推荐数据库：
 | `analysis_page_id` | `varchar(128)` | Confluence Page ID |
 | `repo_name` | `varchar(255)` | 目标 Repo 名称 |
 | `repo_url` | `text` | 目标 Repo URL |
-| `base_branch` | `varchar(128)` | 基线分支，由 repo 默认分支或显式配置解析得到 |
-| `base_commit_sha` | `varchar(64)` | 创建工作分支时使用的基线提交 |
+| `base_branch` | `varchar(128)` | 基线分支，在 `repo_resolving` 成功前允许为空，成功后由 repo 默认分支或显式配置解析得到 |
+| `base_commit_sha` | `varchar(64)` | 创建工作分支时使用的基线提交，在 `branch_preparing` 成功前允许为空 |
 | `working_branch` | `varchar(128)` | 工作分支，MVP 为 Jira Key |
 | `implementation_summary` | `text` | 实现结果摘要 |
 | `test_summary` | `text` | 测试结果摘要 |
@@ -456,7 +468,7 @@ create table work_items (
   analysis_page_id varchar(128),
   repo_name varchar(255),
   repo_url text,
-  base_branch varchar(128) not null,
+  base_branch varchar(128),
   base_commit_sha varchar(64),
   working_branch varchar(128),
   implementation_summary text,
@@ -716,7 +728,7 @@ MVP 阶段不建议复杂归档，但建议预留策略：
 
 ## 11. 总结
 
-这份 Schema 草案的核心目标是把三件事固定下来：
+这份表结构草案的核心目标是把三件事固定下来：
 
 1. Ticket 事实怎么存
 2. Flow 执行历史怎么存

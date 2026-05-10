@@ -1,78 +1,78 @@
-# Canonical Workflow Spec: R&D Auto Flow MVP
+# 规范工作流说明：R&D Auto Flow MVP
 
-## 1. Purpose
+## 1. 文档目的
 
-This document is the authoritative workflow contract for MVP.
+本文档是 MVP 阶段唯一的工作流规范真相源。
 
-If other docs conflict with this file, this file wins.
+如果其他文档与本文档冲突，以本文档为准。
 
-It fixes eight things before implementation starts:
+它在实现开始前固定以下八件事：
 
-1. MVP boundary
-2. canonical state machine
-3. manual action and approval model
-4. evidence and closure gate model
-5. rerun / resume semantics
-6. repository / branch contract
-7. workflow runner semantics
-8. authorization and actor model
+1. MVP 边界
+2. 规范状态机
+3. 人工动作与审批模型
+4. 证据与关闭门禁模型
+5. 重跑与恢复语义
+6. 仓库与分支契约
+7. 工作流执行器契约
+8. 鉴权与操作者模型
 
 ---
 
-## 2. MVP Boundary
+## 2. MVP 边界
 
-MVP is an orchestration and governance system, not a fully autonomous implementation runtime.
+MVP 是一个编排与治理系统，不是一个全自动编码执行引擎。
 
-In MVP, the system must:
+在 MVP 中，系统必须做到：
 
-1. accept a manually selected Jira ticket
-2. fetch and normalize Jira context
-3. read referenced Confluence pages
-4. generate and create the analysis page
-5. resolve the target GitHub repository
-6. create or verify the working branch
-7. track the implementation and verification stages as first-class workflow stages
-8. collect structured implementation and test evidence
-9. enforce approval and closure gates
-10. write results back to Confluence and Jira
+1. 接收人工指定的 Jira Ticket
+2. 拉取并标准化 Jira 上下文
+3. 读取引用的 Confluence 页面
+4. 生成并创建分析页
+5. 解析目标 GitHub 仓库
+6. 创建或校验工作分支
+7. 将实现与验证作为一等工作流阶段追踪
+8. 收集结构化实现证据与测试证据
+9. 执行审批与关闭门禁
+10. 将结果回写到 Confluence 和 Jira
 
-In MVP, the system does not have to:
+在 MVP 中，系统不必做到：
 
-1. autonomously modify repository code
-2. autonomously run all test commands inside the target repository
-3. provide a generic approval engine
-4. support multi-repo orchestration
+1. 自动修改目标仓库代码
+2. 自动在目标仓库内运行全部测试命令
+3. 提供通用可配置审批引擎
+4. 支持多仓库编排
 
-Interpretation:
+解释如下：
 
-- `implementation_waiting` means implementation is performed outside the workflow engine, but the workflow engine still owns state, evidence, audit, and closure gating.
-- `verification_waiting` means verification evidence is produced outside the workflow engine, but the workflow engine still owns evidence capture, approval, and final closure gating.
+- `implementation_waiting` 表示实现动作发生在工作流引擎之外，但工作流引擎仍然负责状态、证据、审计与关闭门禁。
+- `verification_waiting` 表示验证证据生成在工作流引擎之外，但工作流引擎仍然负责证据采集、审批与最终关闭门禁。
 
-### 2.1 Actor Model
+### 2.1 参与者模型
 
-MVP has three actor classes:
+MVP 有三类参与者：
 
 1. `system`
-   - the workflow runner that advances automatic stages
+   - 推进自动阶段的工作流执行器
 2. `operator`
-   - the human who starts a flow, submits evidence, or performs manual actions
+   - 启动流程、提交证据或执行人工动作的人
 3. `external_executor`
-   - a human or external agent that performs implementation or verification outside the workflow engine
+   - 在工作流引擎外执行实现或验证的人或外部 Agent
 
-Rules:
+规则如下：
 
-1. the workflow engine owns orchestration state
-2. implementation and test execution may happen outside the workflow engine
-3. closure gates depend on persisted evidence, not on free-text claims
-4. every manual action, evidence submission, and approval decision must persist an immutable actor snapshot
+1. 工作流引擎拥有编排状态的最终控制权
+2. 实现和测试执行可以发生在工作流引擎外部
+3. 关闭门禁依赖持久化证据，而不是自由文本声明
+4. 每次人工动作、证据提交和审批决定都必须持久化不可变的操作者快照
 
 ---
 
-## 3. Canonical Workflow Vocabulary
+## 3. 规范术语
 
-### 3.1 Overall Status
+### 3.1 总状态
 
-These are the only allowed flow-level statuses in MVP:
+以下是 MVP 允许的唯一流程级状态：
 
 - `pending`
 - `running`
@@ -82,9 +82,9 @@ These are the only allowed flow-level statuses in MVP:
 - `completed`
 - `cancelled`
 
-### 3.2 Stage Names
+### 3.2 阶段名称
 
-These are the only allowed stage names in MVP:
+以下是 MVP 允许的唯一阶段名称：
 
 1. `manual_request_received`
 2. `jira_ticket_fetching`
@@ -103,9 +103,9 @@ These are the only allowed stage names in MVP:
 15. `jira_status_updating`
 16. `completed`
 
-### 3.3 Stage Status
+### 3.3 阶段状态
 
-These are the only allowed stage-run statuses in MVP:
+以下是 MVP 允许的唯一阶段执行状态：
 
 - `pending`
 - `running`
@@ -114,28 +114,29 @@ These are the only allowed stage-run statuses in MVP:
 - `skipped`
 - `waiting_manual_action`
 
-### 3.4 Blocking Model
+### 3.4 阻塞模型
 
-Do not create ad hoc stages such as `awaiting-repo-resolution` or `branch-creation-failed`.
+不要创建诸如 `awaiting-repo-resolution` 或 `branch-creation-failed` 之类的临时阶段。
 
-Blocking is expressed by:
+阻塞必须通过以下字段表达：
 
-1. current canonical stage
-2. flow `overall_status`
+1. 当前规范阶段
+2. Flow 的 `overall_status`
 3. `blocking_reason_code`
 4. `blocking_reason_message`
 5. `manual_action_required`
 6. `manual_action_type`
 
-`blocking_reason_code` is for stable programmatic handling.
+其中：
 
-`blocking_reason_message` is for operator-facing diagnosis.
+- `blocking_reason_code` 用于稳定的程序处理
+- `blocking_reason_message` 用于面向操作者的诊断提示
 
 ---
 
-## 4. Canonical Stage Flow
+## 4. 规范阶段流
 
-Primary path:
+主路径如下：
 
 `manual_request_received`
 -> `jira_ticket_fetching`
@@ -156,26 +157,26 @@ Primary path:
 
 ---
 
-## 5. Approval Model
+## 5. 审批模型
 
-MVP supports two fixed approval checkpoints, not a generic configurable approval engine.
+MVP 只支持两个固定审批检查点，不引入通用可配置审批引擎。
 
-### 5.1 Fixed Checkpoints
+### 5.1 固定检查点
 
-1. analysis approval: after analysis page creation, before repository and implementation progression
-2. verification approval: after verification evidence is recorded, before Confluence final writeback and Jira completion
+1. 分析审批：分析页创建后、仓库与实现推进前
+2. 验证审批：验证证据录入后、Confluence 最终回写与 Jira 完成前
 
-### 5.2 Approval Outcomes
+### 5.2 审批结果
 
-MVP approval outcomes are:
+MVP 审批结果固定为：
 
 - `approved`
 - `rejected`
 - `changes_requested`
 
-### 5.3 Approval Actions
+### 5.3 审批动作
 
-The manual action vocabulary must include:
+人工动作词表必须包含：
 
 - `pause`
 - `resume`
@@ -189,33 +190,33 @@ The manual action vocabulary must include:
 - `approve_verification`
 - `request_verification_changes`
 
-### 5.4 Approval Policy
+### 5.4 审批策略
 
-MVP keeps approvals fixed, but they are still first-class records.
+虽然审批点固定，但审批记录必须是一等实体。
 
-Each approval decision must persist:
+每次审批决定都必须持久化：
 
 1. `checkpoint`
 2. `outcome`
 3. `note`
-4. immutable approver snapshot
-5. decision timestamp
+4. 不可变审批人快照
+5. 决策时间戳
 
-Minimum policy:
+最小策略如下：
 
-1. `approve_analysis` and `approve_verification` require explicit capability
-2. `skip_stage`, `cancel`, and `set_repo_override` require explicit capability
-3. self-approval is allowed only if the deployment policy explicitly permits it; otherwise the backend must reject it
+1. `approve_analysis` 与 `approve_verification` 需要显式能力
+2. `skip_stage`、`cancel`、`set_repo_override` 需要显式能力
+3. 是否允许自审必须由部署策略明确决定；若未允许，后端必须拒绝
 
 ---
 
-## 6. Evidence Model
+## 6. 证据模型
 
-MVP must persist structured evidence. Logs and free-text summaries are not enough.
+MVP 必须持久化结构化证据，日志和自由文本摘要都不够。
 
-### 6.1 Evidence Record Types
+### 6.1 证据记录类型
 
-At minimum, support these evidence types:
+至少支持以下证据类型：
 
 - `analysis_snapshot`
 - `branch_snapshot`
@@ -225,9 +226,9 @@ At minimum, support these evidence types:
 - `approval_decision`
 - `final_writeback`
 
-### 6.2 Minimum Test Evidence Payload
+### 6.2 最小测试证据载荷
 
-Each test evidence record should support:
+每条测试证据至少应支持：
 
 1. `command`
 2. `result`
@@ -238,212 +239,212 @@ Each test evidence record should support:
 7. `operator`
 8. `recorded_at`
 
-### 6.3 Evidence Ingress Contract
+### 6.3 证据录入契约
 
-The system must expose a structured evidence ingress surface.
+系统必须暴露结构化证据录入接口。
 
-Minimum API surface:
+最小 API 面包括：
 
 1. `GET /api/flows/{flowRunId}/evidence`
 2. `POST /api/flows/{flowRunId}/evidence`
 
-Evidence must be queryable by:
+证据必须支持按以下维度查询：
 
 1. `stage`
 2. `evidenceType`
 3. `createdAt`
 4. `operator`
 
-### 6.4 Closure Gates
+### 6.4 关闭门禁
 
-Jira can move to completed only when all are true:
+只有在以下条件全部满足时，Jira 才允许进入完成态：
 
-1. analysis page exists
-2. target repo is resolved
-3. working branch is prepared
-4. implementation completion has been recorded
-5. verification evidence exists
-6. verification approval is approved
-7. Confluence final writeback is complete
+1. 分析页已存在
+2. 目标仓库已解析
+3. 工作分支已准备完成
+4. 实现完成事实已记录
+5. 验证证据已存在
+6. 验证审批结果为通过
+7. Confluence 最终回写已完成
 
 ---
 
-## 7. Rerun and Resume Semantics
+## 7. 重跑与恢复语义
 
-### 7.1 Trigger Modes
+### 7.1 触发模式
 
-The supported trigger modes are:
+支持的触发模式如下：
 
 - `manual_start`
 - `rerun`
 - `resume_from_failure`
 
-`auto_assigned` is reserved for post-MVP.
+`auto_assigned` 预留给 MVP 之后的阶段。
 
-### 7.2 Create Flow Rules
+### 7.2 创建流程规则
 
-`POST /api/flows` must support:
+`POST /api/flows` 必须支持：
 
 1. `jiraKey`
 2. `triggerMode`
 3. `repoOverride`
 4. `note`
-5. `sourceFlowRunId` for `rerun` and `resume_from_failure`
-6. `resumeFromStage` for `resume_from_failure` when needed
+5. `sourceFlowRunId`，用于 `rerun` 和 `resume_from_failure`
+6. `resumeFromStage`，用于需要指定恢复起点的 `resume_from_failure`
 
-### 7.3 Semantic Differences
+### 7.3 语义差异
 
 `manual_start`
 
-- creates a new flow with no dependency on a prior flow
+- 创建一个与历史流程无依赖的新流程
 
 `rerun`
 
-- creates a new flow linked to a prior flow
-- restarts from the beginning of the canonical workflow
+- 创建一个关联历史流程的新流程
+- 从规范工作流起点重新开始
 
 `resume_from_failure`
 
-- creates a new flow or recovery flow linked to a prior flow
-- resumes from a canonical stage boundary
+- 创建一个关联历史流程的新流程或恢复流程
+- 从某个规范阶段边界继续执行
 
-### 7.4 Conflict Rules
+### 7.4 冲突规则
 
-If an active flow exists for the same Jira ticket:
+如果同一个 Jira Ticket 已存在活动流程：
 
-1. default create must be rejected with `FLOW_CONFLICT`
-2. the API response must include the conflicting flow id, status, and stage
-3. the user must explicitly choose rerun or resume
+1. 默认创建请求必须以 `FLOW_CONFLICT` 拒绝
+2. API 响应必须返回冲突流程的 ID、状态和阶段
+3. 用户必须显式选择重跑或恢复
 
 ---
 
-## 8. Repository and Branch Contract
+## 8. 仓库与分支契约
 
-MVP must not hardcode `master` as the only valid base branch.
+MVP 不能把 `master` 写死为唯一合法基线分支。
 
-### 8.1 Base Branch
+### 8.1 基线分支
 
-Use:
+基线分支来源只能是：
 
-1. resolved repository default branch, or
-2. explicit configured override
+1. 解析得到的仓库默认分支，或
+2. 显式配置的覆盖分支
 
-Persist both:
+并且必须同时持久化：
 
 1. `base_branch`
 2. `base_commit_sha`
 
-### 8.2 Working Branch
+### 8.2 工作分支
 
-Default working branch name:
+默认工作分支名为：
 
 `<jira-key>`
 
-### 8.3 Branch Preparation Rules
+### 8.3 分支准备规则
 
-`branch_preparing` must cover:
+`branch_preparing` 必须覆盖：
 
-1. resolving the base branch
-2. capturing base commit sha
-3. checking whether the working branch already exists
-4. creating the working branch when needed
-5. recording whether the result was created or reused
+1. 解析基线分支
+2. 记录基线提交 `sha`
+3. 检查工作分支是否已存在
+4. 在需要时创建工作分支
+5. 记录结果是创建还是复用
 
-Required branch outcomes:
+分支结果必须归类为：
 
 1. `created`
 2. `reused`
 3. `blocked_diverged`
 4. `blocked_permission_denied`
 
-Policy:
+策略如下：
 
-1. if the branch does not exist, create it from the resolved base branch
-2. if the branch exists and its head matches the recorded branch intent, reuse it
-3. if the branch exists but conflicts with the intended base lineage, do not silently reuse it; block and require manual action
-4. rerun and resume must not create hidden alternate branch names in MVP
-5. the working branch name must directly equal `<jira-key>`
+1. 若分支不存在，则从解析出的基线分支创建
+2. 若分支存在且头指针与记录的分支意图一致，则复用
+3. 若分支存在但与预期基线谱系冲突，则不得静默复用，必须阻塞并要求人工处理
+4. MVP 中，重跑和恢复都不得生成隐藏的替代分支名
+5. 工作分支名必须直接等于 `<jira-key>`
 
-### 8.4 Repo Resolution Policy
+### 8.4 仓库解析策略
 
-Repository resolution precedence:
+仓库解析优先级如下：
 
-1. explicit `repoOverride`
-2. ticket-level explicit mapping field if configured
-3. Jira project to repo mapping table
+1. 显式 `repoOverride`
+2. 工单级显式映射字段（若已配置）
+3. 配置文档中的 Jira Project 到 Repo 映射
 
-`POST /api/flows/precheck` must return:
+`POST /api/flows/precheck` 必须返回：
 
-1. whether the ticket exists
-2. whether the repo resolves
-3. the resolved repo name
-4. the resolved base branch
-5. whether an active flow already exists
-
----
-
-## 9. Workflow Runner Contract
-
-MVP does not require a separate queueing platform, but it does require durable runner semantics.
-
-### 9.1 Runnable Stage Contract
-
-A stage is runnable only when:
-
-1. the flow is in `pending` or `running`
-2. the current stage is canonical
-3. the stage is not waiting for manual action
-4. no active lease exists for the same stage attempt
-
-### 9.2 Lease and Recovery Contract
-
-Each running stage attempt must support:
-
-1. lease owner
-2. lease expiry
-3. heartbeat timestamp
-4. bounded retry count
-
-Rules:
-
-1. only one worker may hold the active lease for a stage attempt
-2. expired leases may be reclaimed
-3. external side effects must be wrapped in idempotent stage logic
-4. crash recovery must resume from persisted stage state, not from in-memory assumptions
-
-### 9.3 Manual Action Race Contract
-
-If a manual action targets a flow with an active stage lease:
-
-1. the action must be persisted first
-2. the runner must re-check flow state before committing the next transition
-3. the runner must not advance a stage after a conflicting pause or cancel has been accepted
+1. Ticket 是否存在
+2. 仓库是否可解析
+3. 解析得到的仓库名
+4. 解析得到的基线分支
+5. 是否已存在活动流程
 
 ---
 
-## 10. Search and Precheck Contract
+## 9. 工作流执行器契约
 
-The frontend contract requires both search and precheck.
+MVP 不要求单独引入队列平台，但必须具备持久化执行器语义。
 
-MVP should expose:
+### 9.1 可执行阶段契约
+
+只有满足以下条件时，阶段才可执行：
+
+1. Flow 处于 `pending` 或 `running`
+2. 当前阶段是规范阶段
+3. 当前阶段不在等待人工动作
+4. 同一阶段尝试上不存在活动租约
+
+### 9.2 租约与恢复契约
+
+每个运行中的阶段尝试必须支持：
+
+1. 租约持有者
+2. 租约过期时间
+3. 心跳时间戳
+4. 有界重试次数
+
+规则如下：
+
+1. 同一阶段尝试任一时刻只能有一个执行器持有活动租约
+2. 过期租约允许被回收
+3. 外部副作用必须包裹在幂等阶段逻辑中
+4. 崩溃恢复必须从持久化阶段状态恢复，而不是依赖内存假设
+
+### 9.3 人工动作竞争契约
+
+如果某个人工动作作用于一个仍持有活动阶段租约的流程：
+
+1. 该人工动作必须先持久化
+2. 执行器在提交下一个状态迁移前必须重新检查流程状态
+3. 如果冲突的暂停或取消已被接受，执行器不得继续推进阶段
+
+---
+
+## 10. 搜索与预检查契约
+
+前端契约要求系统同时提供搜索与预检查能力。
+
+MVP 应暴露：
 
 1. `GET /api/jira/issues/search?query=...`
 2. `POST /api/flows/precheck`
 
 ---
 
-## 11. Minimal Authorization Contract
+## 11. 最小鉴权契约
 
-MVP does not need full RBAC, but it must define authorization for sensitive actions.
+MVP 不需要完整 RBAC，但必须为敏感动作定义鉴权边界。
 
-The backend must receive at least:
+后端至少必须能拿到：
 
 1. `operatorId`
 2. `operatorEmail`
 3. `operatorDisplayName`
 4. `operatorCapabilities`
 
-Minimum capability vocabulary:
+最小能力词表如下：
 
 1. `flow:start`
 2. `flow:pause`

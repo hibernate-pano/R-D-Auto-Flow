@@ -1,5 +1,12 @@
 # RPD：Jira - Confluence - GitHub 研发闭环工作流
 
+## Authority
+
+- Authority level: Product context and rationale, subordinate to `docs/canonical-workflow-spec.md`
+- Primary upstream source: `docs/canonical-workflow-spec.md`
+- Usage rule: This document explains product motivation, goals, and derived elaboration. It must not override the canonical workflow/MVP rules.
+- Conflict rule: If this document conflicts with canonical workflow behavior, state semantics, approval semantics, or MVP scope, `docs/canonical-workflow-spec.md` wins.
+
 ## 1. 文档定位
 
 - 文档类型：RPD / 产品需求与方案说明
@@ -313,6 +320,8 @@ v1 固定支持以下审批点：
 
 ### FR-1A：自动触发能力
 
+> Note: This section is informational for post-MVP direction. It must not be treated as an MVP implementation requirement.
+
 系统可支持“新 Jira Ticket 被指派给当前用户后自动触发 Flow”，但该能力不属于 MVP 必备项。
 
 该能力应作为后续增强项设计，支持以下模式：
@@ -324,6 +333,7 @@ v1 / MVP 建议：
 
 - 优先交付手动触发
 - 自动触发延后到后续阶段
+
 ### FR-2：Jira Ticket 内容获取与标准化
 
 系统在用户手动指定 Ticket 后，必须拉取完整问题单内容，并标准化为统一内部任务对象。
@@ -442,7 +452,7 @@ v1 / MVP 建议：
    - `model`
    - `timeout`
    - `retry_policy`
-2. Prompt 必须围绕以下输出目标组织：
+2. 提示词必须围绕以下输出目标组织：
    - 需求分析
    - 任务拆解
    - 技术设计
@@ -468,7 +478,7 @@ v1 / MVP 建议：
 
 v1 建议：
 
-- 采用配置表方式维护 Jira Project 与 GitHub Repo 的映射关系
+- 采用 YAML 配置文档维护 Jira Project 与 GitHub Repo 的映射关系
 
 ### FR-9：开发分支创建
 
@@ -777,14 +787,16 @@ v1 不建议过早做“多模型供应商抽象”。既然现有 Bridge 已经
 ### 12.2 证据实体：Evidence
 
 - `evidence_id`
-- `work_item_id`
+- `flow_run_id`
 - `type`
-  - `analysis`
-  - `branch`
-  - `test`
-  - `manual-check`
-  - `final-update`
-- `content`
+  - `analysis_snapshot`
+  - `branch_snapshot`
+  - `implementation_note`
+  - `test_execution`
+  - `manual_verification`
+  - `approval_decision`
+  - `final_writeback`
+- `payload`
 - `created_at`
 - `source_system`
 
@@ -879,7 +891,7 @@ MVP 必须将 Evidence 作为正式持久化实体，而不是只保留 `test_su
 - 通过现有 Bridge 调用 OpenAI 兼容接口
 - 配置 Copilot Bridge 对应的模型名
 - 支持较长上下文输入，承载 Jira + Confluence 内容
-- 通过模板化 Prompt 生成结构稳定的输出
+- 通过模板化提示词生成结构稳定的输出
 - 支持超时、重试、结构化校验
 
 建议配置项：
@@ -1115,7 +1127,7 @@ MVP 必须将 Evidence 作为正式持久化实体，而不是只保留 `test_su
 2. 解析 Ticket 中的 Confluence 链接
 3. 拉取 Confluence 源文档
 4. 基于固定模板生成详尽分析页
-5. 从目标 Repo 的 `master` 创建开发分支
+5. 从解析出的基线分支创建开发分支，不写死 `master`
 6. 记录实现与测试结果
 7. 只有在关闭门禁通过后才更新 Jira 为完成
 8. 统一使用现有 `14434` Copilot Bridge 作为唯一 LLM 后端
@@ -1181,24 +1193,26 @@ MVP 必须将 Evidence 作为正式持久化实体，而不是只保留 `test_su
 
 ---
 
-## 22. 待确认产品决策
+## 22. MVP 决策摘录（派生摘要，规范仍以 canonical 为准）
 
-在进入实现前，建议明确以下产品策略：
+> Note: This section is a derived summary for readability. It must stay aligned with `docs/canonical-workflow-spec.md` and must not be treated as a separate normative source.
 
-1. 分析页生成后，流程是全自动继续，还是需要人工确认再进入开发阶段？
-2. Jira 中“完成态”具体对应哪个状态名？
-3. 是否要求在 Jira Comment 中回写分析页链接和分支链接？
-4. Jira Project 到 GitHub Repo 的映射如何维护？
-5. v1 是否限定一个 Ticket 只能对应一个 Repo？
-6. v1 是否只创建分支，还是同时纳入 PR 创建？
-7. “足量 UT / 测试”的最低标准如何定义？
-8. 若实现偏离原分析页，系统如何记录和回写？
-9. Confluence 分析页在重复执行时应覆盖、追加还是版本化？
-10. 编码动作由人工完成、Agent 完成，还是采用混合模式？
-11. Copilot Bridge 在 v1 中默认使用哪个模型？
-12. Bridge 是否需要 API Key，还是仅依赖本地访问控制？
-13. 该系统部署在个人机器上，还是部署为内部中心化服务？
-14. 自动触发在后续阶段启用时，默认采用轮询还是 webhook？
+为避免文档闭环看似完整但实现时仍大量返工，MVP 采用以下定稿策略：
+
+1. 分析页生成后必须进入 `analysis_approval_waiting`，默认需要人工确认通过后才能进入仓库与开发准备阶段。
+2. Jira 的“完成态”不写死在代码中，统一通过项目级配置映射，例如 `jiraDoneStatusName`。
+3. Jira Comment 回写不作为 MVP 关闭门禁必需项，可配置开启；门禁只强依赖 Jira 状态更新与 Confluence 最终回写。
+4. Jira Project 到 GitHub Repo 的映射由 YAML 配置文档维护，MVP 不引入数据库配置表和自助式后台配置界面。
+5. v1 固定为单 Ticket 单 Repo，不支持一个 Ticket 同时编排多个 Repo。
+6. v1 只负责创建或复用工作分支，不纳入 PR 自动创建。
+7. “足量测试”的最低标准为：进入验证审批前，必须至少存在一条 `implementation_note`，以及一条 `test_execution` 或 `manual_verification`；若未提供自动化测试，必须在 `manual_verification` 中说明原因、范围和风险。
+8. 若实现偏离原分析页，必须在 `implementation_note` 与 Confluence 最终回写中显式记录偏离原因、实际实现和影响范围。
+9. 同一 Ticket 在 v1 维持单一分析页，重复执行采用在原分析页中追加新的执行记录与结果章节，不创建隐藏副本。
+10. 编码与验证动作允许人工、外部 Agent 或混合模式完成，但工作流系统只基于结构化证据推进。
+11. Bridge 使用的具体模型由 `LLM_MODEL` 运行时配置决定，文档不把模型名写死为固定型号。
+12. `LLM_API_KEY` 作为可选运行时配置保留；如果 Bridge 不要求鉴权，则允许留空。
+13. v1 以内部中心化服务为默认部署形态，前端与后端统一部署，鉴权依赖现有企业登录态或网关；相关业务规则默认通过配置文档维护。
+14. 自动触发属于后续能力，默认设计方向为 webhook 优先、轮询兜底，但不纳入 MVP 实现范围。
 
 ---
 
@@ -1206,7 +1220,6 @@ MVP 必须将 Evidence 作为正式持久化实体，而不是只保留 `test_su
 
 为了形成一个既强约束又可落地的 v1，建议采用以下模式：
 
-1. Jira 接单自动化
 1. 手动指定 Jira Ticket 作为 MVP 主入口
 2. Confluence 源文档收集自动化
 3. Confluence 分析页生成自动化

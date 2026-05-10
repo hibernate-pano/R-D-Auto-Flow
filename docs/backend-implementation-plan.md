@@ -1,5 +1,15 @@
 # 后端实现计划：R&D Auto Flow MVP
 
+## Authority
+
+- Authority level: Derived engineering implementation plan, subordinate to canonical workflow rules
+- Primary upstream sources:
+  - `docs/canonical-workflow-spec.md`
+  - `docs/mvp-technical-design.md`
+  - `docs/api-contract.md`
+- Usage rule: This document sequences backend work and engineering boundaries for an already-decided MVP.
+- Conflict rule: Backend implementation behavior must follow canonical workflow semantics first, then derived interface/design contracts.
+
 ## 1. 文档定位
 
 - 文档类型：后端实现计划
@@ -49,6 +59,44 @@
 4. 所有状态变化必须可追踪
 5. 所有人工操作必须可审计
 6. 先保障恢复能力，再追求自动化程度
+
+## 3.1 推荐后端技术栈
+
+MVP 后端建议采用以下组合：
+
+1. 运行时与语言
+   - `Node.js 20`
+   - `TypeScript`
+
+2. Web 框架
+   - `Fastify`
+
+3. 校验层
+   - `Zod`
+   - 用于请求参数、响应 DTO、环境变量、YAML 配置、Evidence payload 与 LLM 输出校验
+
+4. 数据访问与迁移
+   - `PostgreSQL 16`
+   - `Kysely`
+   - 手写 SQL migration，配合 `dbmate` 或 `node-pg-migrate`
+
+5. 执行器
+   - 后端进程内 `runner`
+   - 从数据库轮询 runnable stages
+   - 抢占 stage lease
+   - 续约 heartbeat
+   - 处理超时恢复与有界重试
+
+6. 日志与可观测性
+   - `Pino`
+   - `OpenTelemetry`
+
+推荐这套组合的原因：
+
+1. 后端复杂度主要集中在状态机、恢复、审计和 Connector，而不是复杂控制器层
+2. `Fastify` 足够轻，便于把工作流逻辑保持为显式代码，而不是分散到过重的框架装饰器体系中
+3. 当前 schema 对 SQL 控制力要求高，`Kysely + migration` 更适合租约字段、恢复索引、追加式历史和 `jsonb` 结构
+4. 文档已明确 MVP 不要求独立队列平台，因此不建议在这一阶段引入 Redis、BullMQ、Temporal 或 Kafka
 
 ---
 
@@ -116,7 +164,7 @@
 
 - Jira Key
 - 启动模式
-- Repo Override（可选）
+- 仓库覆盖（可选）
 - 备注（可选）
 
 后端需要完成：
@@ -148,7 +196,7 @@
 3. 终止
 4. 重试阶段
 5. 跳过阶段
-6. 设置 Repo Override
+6. 设置仓库覆盖
 7. 修正 Confluence 链接
 8. 通过分析审批
 9. 要求补充分析内容
@@ -316,38 +364,15 @@ MVP 建议使用关系型数据库。
 
 ## 7. 状态机与阶段执行器
 
+本节不重复定义 canonical 的状态机词表，只描述后端需要如何实现它。
+
 ## 7.1 总状态
 
-总状态枚举建议：
-
-- `pending`
-- `running`
-- `waiting_manual_action`
-- `paused`
-- `failed`
-- `completed`
-- `cancelled`
+总状态枚举直接复用 `docs/canonical-workflow-spec.md`。
 
 ## 7.2 阶段枚举
 
-建议阶段枚举：
-
-- `manual_request_received`
-- `jira_ticket_fetching`
-- `jira_ticket_normalized`
-- `confluence_links_extracting`
-- `source_pages_fetching`
-- `analysis_generating`
-- `analysis_page_creating`
-- `analysis_approval_waiting`
-- `repo_resolving`
-- `branch_preparing`
-- `implementation_waiting`
-- `verification_waiting`
-- `verification_approval_waiting`
-- `confluence_result_updating`
-- `jira_status_updating`
-- `completed`
+阶段枚举与顺序直接复用 canonical。后端代码中不得自创平行阶段词表。
 
 ## 7.3 阶段执行器接口
 
@@ -602,6 +627,8 @@ interface StageExecutor {
 
 - `jira_project_key -> github_repo`
 
+MVP 默认采用 YAML 配置文档维护此类业务配置，不引入数据库配置表。
+
 ---
 
 ## 11. 错误码设计
@@ -666,7 +693,7 @@ interface StageExecutor {
 
 ## 13. 实现批次
 
-## 13.1 Batch 1：状态机骨架 + 基础 API
+## 13.1 批次 1：状态机骨架 + 基础 API
 
 范围：
 
@@ -683,7 +710,7 @@ interface StageExecutor {
 - 能查询 Flow
 - 能记录基础状态
 
-## 13.2 Batch 2：Jira 接入
+## 13.2 批次 2：Jira 接入
 
 范围：
 
@@ -695,7 +722,7 @@ interface StageExecutor {
 
 - 输入 Jira Key 后能真实拉取 Ticket
 
-## 13.3 Batch 3：Confluence 源页读取 + LLM 生成
+## 13.3 批次 3：Confluence 源页读取 + LLM 生成
 
 范围：
 
@@ -708,7 +735,7 @@ interface StageExecutor {
 
 - 能产出结构化分析文档内容
 
-## 13.4 Batch 4：Confluence 分析页创建 + GitHub 分支创建
+## 13.4 批次 4：Confluence 分析页创建 + GitHub 分支创建
 
 范围：
 
@@ -721,7 +748,7 @@ interface StageExecutor {
 - 能在 Confluence 落页
 - 能创建 `<jira-key>` 分支
 
-## 13.5 Batch 5：人工干预 + 恢复能力
+## 13.5 批次 5：人工干预 + 恢复能力
 
 范围：
 
@@ -734,7 +761,7 @@ interface StageExecutor {
 
 - 用户能从前端接管流程
 
-## 13.6 Batch 6：Evidence、审批与闭环回写
+## 13.6 批次 6：证据、审批与闭环回写
 
 范围：
 
@@ -777,7 +804,7 @@ interface StageExecutor {
 
 ## 14.3 回归测试
 
-每个 Batch 合入前至少验证：
+每个批次合入前至少验证：
 
 1. Flow 列表 API 不回退
 2. Flow 详情 API 不回退
@@ -799,7 +826,7 @@ interface StageExecutor {
 
 对策：
 
-1. 强约束 Prompt
+1. 强约束提示词
 2. 输出结构校验
 3. 不合格则阻塞，不直接落页
 

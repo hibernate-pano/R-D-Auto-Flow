@@ -1,5 +1,15 @@
 # 前端页面详细设计：R&D Auto Flow MVP
 
+## Authority
+
+- Authority level: Derived UI and interaction design, subordinate to canonical workflow rules
+- Primary upstream sources:
+  - `docs/canonical-workflow-spec.md`
+  - `docs/mvp-technical-design.md`
+  - `docs/api-contract.md`
+- Usage rule: This document explains how the approved workflow appears in the operator workbench UI.
+- Conflict rule: UI behavior that conflicts with canonical state, approval, evidence, or action rules must defer to canonical and the derived API contract.
+
 ## 1. 文档定位
 
 - 文档类型：前端页面详细设计
@@ -22,6 +32,36 @@
 
 MVP 阶段不追求复杂视觉表达，重点是信息密度、状态清晰度和操作可控性。
 
+## 2.1 推荐前端技术栈
+
+MVP 前端建议采用以下技术栈：
+
+1. 基础框架
+   - `React + TypeScript + Vite`
+
+2. 路由
+   - `TanStack Router`
+   - 用于承载列表筛选、详情路由、日志视图与基于 URL 的页面状态
+
+3. 数据获取
+   - `TanStack Query`
+   - 前端只缓存服务端查询结果，不在客户端复制工作流真相源
+
+4. 表单与校验
+   - `React Hook Form + Zod`
+   - 适用于手动启动、人工动作、证据录入与冲突确认等表单
+
+5. UI 组件
+   - `Ant Design`
+   - 重点复用表格、抽屉、弹窗、时间线、表单与状态标签能力
+
+推荐理由：
+
+1. 当前产品是内部操作工作台，不是内容站点，不需要为 SSR 增加额外复杂度
+2. 前端核心是高密度数据展示、过滤、详情查看与动作提交，成熟后台组件库的收益明显高于自建设计系统
+3. 页面中存在较多 URL 驱动的筛选和详情状态，类型化路由比松散路由更稳
+4. 文档中多处表单都需要强校验和明确错误提示，因此前后端共享 schema 的收益很高
+
 ---
 
 ## 3. 页面清单
@@ -43,7 +83,7 @@ MVP 前端包含以下页面与弹层：
 
 MVP 建议仅保留一层主导航：
 
-1. Flows
+1. 流程
 2. 可选后续扩展：
    - 配置
    - 审批
@@ -65,6 +105,8 @@ MVP 不建议过早引入多导航层级。
 ## 5. Flow 列表页
 
 ## 5.1 页面目标
+
+列表页的状态、阶段和可执行动作语义以上游 canonical 和派生 API contract 为准。本节只描述页面布局和交互承载方式。
 
 让用户在进入系统后的第一屏就能完成以下动作：
 
@@ -97,7 +139,7 @@ MVP 不建议过早引入多导航层级。
 2. 搜索框支持输入：
    - Jira Key
    - Ticket 标题关键字
-   - Flow ID
+   - 流程 ID
 
 ## 5.4 筛选区
 
@@ -154,7 +196,7 @@ MVP 不建议过早引入多导航层级。
 #### Ticket 标题
 
 - 单行截断
-- hover 显示完整标题
+- 悬停显示完整标题
 
 #### 当前阶段
 
@@ -174,7 +216,7 @@ MVP 不建议过早引入多导航层级。
 #### 是否需要人工处理
 
 - 布尔标签
-- `Yes` 时应显著提醒
+- `是` 时应显著提醒
 
 #### 关联对象
 
@@ -218,9 +260,9 @@ MVP 不建议过早引入多导航层级。
 
 1. Jira Key
 2. 启动模式
-3. Repo Override
+3. 仓库覆盖
 4. 备注
-5. Source Flow（重跑 / 恢复时）
+5. 来源流程（重跑 / 恢复时）
 
 ## 6.3 字段定义
 
@@ -248,13 +290,13 @@ MVP 不建议过早引入多导航层级。
 2. 重跑
 3. 失败恢复
 
-### Source Flow
+### 来源流程
 
 - 当启动模式为“重跑”或“失败恢复”时显示
-- 用于选择来源 Flow
+- 用于选择来源流程
 - 恢复模式下可追加选择恢复阶段
 
-### Repo Override
+### 仓库覆盖
 
 - 类型：可选文本输入或下拉
 - 默认隐藏在“高级选项”中
@@ -276,7 +318,7 @@ MVP 不建议过早引入多导航层级。
 3. 若启动成功：
    - 关闭弹窗
    - 刷新列表
-   - 跳转详情页或 toast 提示
+   - 跳转详情页或轻提示
 4. 若启动失败：
    - 在弹窗内显示错误
 
@@ -307,7 +349,7 @@ MVP 不建议过早引入多导航层级。
 1. 顶部摘要区
 2. 阶段时间线区
 3. 关联对象区
-4. Evidence 区
+4. 证据区
 5. 日志区
 6. 人工操作区
 
@@ -405,7 +447,7 @@ MVP 不建议过早引入多导航层级。
 
 点击某条日志，打开日志详情抽屉。
 
-## 7.6A Evidence 区
+## 7.6A 证据区
 
 ### 区块目标
 
@@ -424,7 +466,7 @@ MVP 不建议过早引入多导航层级。
 1. 新增实现说明
 2. 新增测试执行记录
 3. 新增人工验证记录
-4. 查看全部 evidence 明细
+4. 查看全部证据明细
 
 ### 推进规则
 
@@ -516,7 +558,7 @@ MVP 不建议过早引入多导航层级。
 
 ## 9A.1 用途
 
-录入实现、测试和人工验证 evidence。
+录入实现、测试和人工验证证据。
 
 ## 9A.2 类型
 
@@ -543,6 +585,7 @@ MVP 不建议过早引入多导航层级。
 1. 验证结论
 2. 验证范围
 3. 风险说明
+4. 未提供自动化测试时的原因说明
 
 ---
 
@@ -581,8 +624,8 @@ MVP 不建议过早引入多导航层级。
 3. 启动弹窗提交状态
 4. 人工操作提交状态
 5. 日志筛选状态
-6. evidence 列表加载状态
-7. evidence 录入提交状态
+6. 证据列表加载状态
+7. 证据录入提交状态
 
 ## 11.2 推荐原则
 
@@ -604,9 +647,9 @@ MVP 不建议过早引入多导航层级。
 6. `ManualStartDialog`
 7. `EvidencePanel`
 8. `EvidenceSubmitDialog`
-7. `ManualActionDialog`
-8. `ConflictDialog`
-9. `ExternalLinkGroup`
+9. `ManualActionDialog`
+10. `ConflictDialog`
+11. `ExternalLinkGroup`
 
 ---
 
@@ -655,7 +698,7 @@ MVP 不建议过早引入多导航层级。
 1. 日志详情抽屉
 2. 冲突提示弹窗
 3. 高级筛选
-4. Repo Override
+4. 仓库覆盖
 
 ### P2
 
