@@ -1,0 +1,28 @@
+jira:
+  doneStatusByProject:
+    RD: Done
+    RISK: Closed
+
+confluence:
+  defaultSpaceByProject:
+    RD: RDSPACE
+    RISK: RISKSPACE
+  defaultParentPageIdByProject:
+    RD: "123456"
+    RISK: "789012"
+
+github:
+  repoByProject:
+    RD:
+      repoName: hsbc-rd-service
+      repoUrl: https://github.com/org/hsbc-rd-service
+      baseBranch: main
+    RISK:
+      repoName: hsbc-risk-engine
+      repoUrl: https://github.com/org/hsbc-risk-engine
+      baseBranch: master
+
+workflow:
+  jiraCommentWritebackEnabled: false
+  requireAnalysisApproval: true
+  requireVerificationApproval: true

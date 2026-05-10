@@ -1,0 +1,39 @@
+schema: spec-driven
+
+context: |
+  项目名称：R&D Auto Flow MVP
+  项目定位：围绕 Jira、Confluence、GitHub 建立受约束的研发交付闭环系统。
+  当前阶段：只有中文设计文档，尚未开始代码实现。
+  真实前提：
+  - 已有可复用的 LLM Bridge，地址为 http://127.0.0.1:14434
+  - Bridge 使用 OpenAI 兼容协议
+  - 已具备 GitHub、Jira、Confluence 访问 Token
+  - 运行配置默认通过 YAML 配置文档维护
+  - MVP 不自动写代码，不自动跑完整仓库测试链路
+  - MVP 重点是状态机、人工干预、证据闭环、审批门禁、回写闭环
+  关键现有文档：
+  - docs/canonical-workflow-spec.md
+  - docs/rpd-jira-confluence-github-workflow.md
+  - docs/mvp-technical-design.md
+  - docs/frontend-page-detailed-design.md
+  - docs/backend-implementation-plan.md
+  - docs/api-contract.md
+  - docs/database-schema-draft.md
+  - docs/configuration-spec.md
+
+rules:
+  proposal:
+    - 全部文档使用中文
+    - 明确 capability 拆分边界，不要只给宽泛模块名
+    - 保持与现有 docs/ 文档口径一致
+  specs:
+    - 每个 capability 至少覆盖目标、约束、需求、验收
+    - 优先使用 Given/When/Then 表达验收场景
+    - 需求必须能直接指导后续开发与测试
+  design:
+    - 设计必须覆盖模块边界、关键数据流、异常分支、配置策略和实现顺序
+    - 明确哪些是 MVP 必做，哪些是后续增强
+  tasks:
+    - 任务必须可执行、可验证、可并行判断
+    - 使用复选框格式 - [ ]
+    - 任务要细到开发可直接领取
