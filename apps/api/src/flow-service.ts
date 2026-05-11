@@ -224,7 +224,7 @@ export class FlowService {
       createdAt: nowIso(),
     };
 
-    this.context.store.saveEvidence(flowRunId, evidence);
+    await this.context.store.saveEvidenceAsync(flowRunId, evidence);
     this.log(flowRunId, payload.stageName, "info", "evidence_recorded", `Recorded ${payload.evidenceType}`, {
       evidenceType: payload.evidenceType,
     });
@@ -350,7 +350,7 @@ export class FlowService {
         if (!hasCapability(actor, "flow:approve-analysis")) {
           throw new DomainError(errorCodes.approvalCapabilityRequired, "Analysis approval capability missing");
         }
-        this.context.store.saveEvidence(flow.id, {
+        await this.context.store.saveEvidenceAsync(flow.id, {
           id: randomUUID(),
           flowRunId: flow.id,
           stageName: "analysis_approval_waiting",
@@ -379,7 +379,7 @@ export class FlowService {
         if (!hasCapability(actor, "flow:approve-verification")) {
           throw new DomainError(errorCodes.approvalCapabilityRequired, "Verification approval capability missing");
         }
-        this.context.store.saveEvidence(flow.id, {
+        await this.context.store.saveEvidenceAsync(flow.id, {
           id: randomUUID(),
           flowRunId: flow.id,
           stageName: "verification_approval_waiting",
@@ -685,7 +685,7 @@ export class FlowService {
       id: randomUUID(),
       stageName: flow.currentStage,
       status: "running",
-      attemptNo: (existing.at(-1)?.attemptNo ?? 0) + 1,
+      attemptNo: (existing.length > 0 ? existing[existing.length - 1]!.attemptNo : 0) + 1,
       startedAt: now,
       finishedAt: null,
       durationMs: null,
