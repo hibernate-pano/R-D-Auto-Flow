@@ -697,10 +697,10 @@ export class FlowService {
       leaseExpiresAt: new Date(Date.now() + 30_000).toISOString(),
       lastHeartbeatAt: now,
     };
-    await this.context.store.saveStageRun(flow.id, stageRun);
+    await this.context.store.saveStageRunAsync(flow.id, stageRun);
     flow.overallStatus = "running";
     flow.updatedAt = now;
-    await this.context.store.saveFlow(flow);
+    await this.context.store.saveFlowAsync(flow);
     return stageRun;
   }
 
