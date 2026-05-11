@@ -14,10 +14,20 @@ import {
   MockJiraConnector,
   MockLlmConnector,
 } from "./connectors/mock-connectors.js";
+import { RealJiraConnector } from "./connectors/real-jira-connector.js";
+import { RealConfluenceConnector } from "./connectors/real-confluence-connector.js";
+import { RealGithubConnector } from "./connectors/real-github-connector.js";
+import { RealLlmConnector } from "./connectors/real-llm-connector.js";
 import { FlowService } from "./flow-service.js";
 import { InMemoryFlowStore } from "./store/in-memory-store.js";
 import { PgFlowStore } from "./store/pg/pg-flow-store.js";
 import type { FlowStore } from "./types.js";
+
+const DEV_TOKEN_PATTERN = /^dev-/;
+
+function isRealConnector(token: string): boolean {
+  return !DEV_TOKEN_PATTERN.test(token);
+}
 
 function buildActorFromHeaders(headers: Record<string, unknown>) {
   const capabilities = String(headers["x-operator-capabilities"] ?? "")
@@ -52,14 +62,45 @@ export async function buildServer(cwd: string) {
     store = new InMemoryFlowStore();
   }
 
+  // Determine which connectors to use based on token values
+  const useRealJira = isRealConnector(env.JIRA_TOKEN);
+  const useRealConfluence = isRealConnector(env.CONFLUENCE_TOKEN);
+  const useRealGithub = isRealConnector(env.GITHUB_TOKEN);
+  const useRealLlm = isRealConnector(env.LLM_API_KEY);
+
+  const jira = useRealJira
+    ? new RealJiraConnector(env.JIRA_TOKEN, env.JIRA_BASE_URL)
+    : new MockJiraConnector(config);
+  const confluence = useRealConfluence
+    ? new RealConfluenceConnector(env.CONFLUENCE_TOKEN, env.CONFLUENCE_BASE_URL)
+    : new MockConfluenceConnector();
+  const github = useRealGithub
+    ? new RealGithubConnector(env.GITHUB_TOKEN)
+    : new MockGithubConnector();
+  const llm = useRealLlm
+    ? new RealLlmConnector(env.LLM_API_KEY, env.LLM_BASE_URL, env.LLM_MODEL)
+    : new MockLlmConnector();
+
+  app.log.info(
+    {
+      connectors: {
+        jira: useRealJira ? "real" : "mock",
+        confluence: useRealConfluence ? "real" : "mock",
+        github: useRealGithub ? "real" : "mock",
+        llm: useRealLlm ? "real" : "mock",
+      },
+    },
+    "connector mode"
+  );
+
   const service = new FlowService({
     config,
     env,
     store: store as FlowStore,
-    jira: new MockJiraConnector(config),
-    confluence: new MockConfluenceConnector(),
-    github: new MockGithubConnector(),
-    llm: new MockLlmConnector(),
+    jira,
+    confluence,
+    github,
+    llm,
   });
 
   app.log.info({ summary }, "runtime config loaded");
@@ -90,10 +131,10 @@ export async function buildServer(cwd: string) {
     data: {
       status: "ok",
       services: {
-        database: "memory",
-        jira: "mock",
-        confluence: "mock",
-        github: "mock",
+        database: env.DATABASE_URL.startsWith("memory://") ? "memory" : "postgres",
+        jira: useRealJira ? "real" : "mock",
+        confluence: useRealConfluence ? "real" : "mock",
+        github: useRealGithub ? "real" : "mock",
         llmBridge: env.LLM_BASE_URL,
       },
     },

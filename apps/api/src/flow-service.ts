@@ -417,8 +417,8 @@ export class FlowService {
   }
 
   private async runCurrentStage(flow: FlowRun): Promise<AutoStageHandlerResult> {
-    const stageRun = this.startStageRun(flow);
-    this.log(flow.id, flow.currentStage, "info", "stage_started", `Started ${flow.currentStage}`, {});
+    const stageRun = await this.startStageRun(flow);
+    await this.logAsync(flow.id, flow.currentStage, "info", "stage_started", `Started ${flow.currentStage}`, {});
 
     try {
       switch (flow.currentStage) {
@@ -438,7 +438,7 @@ export class FlowService {
           workItem.jiraProjectKey = ticket.jiraProjectKey;
           workItem.assignee = ticket.assignee;
           workItem.updatedAt = nowIso();
-          this.context.store.saveWorkItem(workItem);
+          await this.context.store.saveWorkItem(workItem);
           this.finishStageRun(flow.id, stageRun, "succeeded");
           return { outcome: "continue", nextStage: "confluence_links_extracting" };
         }
@@ -449,7 +449,7 @@ export class FlowService {
           );
           workItem.sourceConfluenceUrls = urls;
           workItem.updatedAt = nowIso();
-          this.context.store.saveWorkItem(workItem);
+          await this.context.store.saveWorkItem(workItem);
           this.finishStageRun(flow.id, stageRun, "succeeded");
           return { outcome: "continue", nextStage: "source_pages_fetching" };
         }
@@ -461,7 +461,7 @@ export class FlowService {
           }
           workItem.sourceConfluenceDigest = digests;
           workItem.updatedAt = nowIso();
-          this.context.store.saveWorkItem(workItem);
+          await this.context.store.saveWorkItem(workItem);
           this.finishStageRun(flow.id, stageRun, "succeeded");
           return { outcome: "continue", nextStage: "analysis_generating" };
         }
@@ -472,7 +472,7 @@ export class FlowService {
             ticket,
             sourcePages: workItem.sourceConfluenceDigest,
           });
-          this.context.store.saveEvidence(flow.id, {
+          await this.context.store.saveEvidence(flow.id, {
             id: randomUUID(),
             flowRunId: flow.id,
             stageName: "analysis_generating",
@@ -510,9 +510,9 @@ export class FlowService {
           workItem.analysisPageId = page.pageId;
           workItem.analysisPageUrl = page.pageUrl;
           workItem.updatedAt = nowIso();
-          this.context.store.saveWorkItem(workItem);
+          await this.context.store.saveWorkItem(workItem);
           this.finishStageRun(flow.id, stageRun, "succeeded");
-          this.transitionTo(flow, "analysis_approval_waiting", "waiting_manual_action", {
+          await this.transitionTo(flow, "analysis_approval_waiting", "waiting_manual_action", {
             manualActionRequired: true,
             manualActionType: "approve_analysis",
             blockingReasonCode: null,
@@ -532,7 +532,7 @@ export class FlowService {
           workItem.repoUrl = repoMapping.repoUrl;
           workItem.baseBranch = repoMapping.baseBranch;
           workItem.updatedAt = nowIso();
-          this.context.store.saveWorkItem(workItem);
+          await this.context.store.saveWorkItem(workItem);
           this.finishStageRun(flow.id, stageRun, "succeeded");
           return { outcome: "continue", nextStage: "branch_preparing" };
         }
@@ -555,8 +555,8 @@ export class FlowService {
           workItem.baseCommitSha = prepared.baseCommitSha;
           workItem.workingBranch = prepared.workingBranch;
           workItem.updatedAt = nowIso();
-          this.context.store.saveWorkItem(workItem);
-          this.context.store.saveEvidence(flow.id, {
+          await this.context.store.saveWorkItem(workItem);
+          await this.context.store.saveEvidence(flow.id, {
             id: randomUUID(),
             flowRunId: flow.id,
             stageName: "branch_preparing",
@@ -573,7 +573,7 @@ export class FlowService {
             );
           }
           this.finishStageRun(flow.id, stageRun, "succeeded");
-          this.transitionTo(flow, "implementation_waiting", "waiting_manual_action", {
+          await this.transitionTo(flow, "implementation_waiting", "waiting_manual_action", {
             manualActionRequired: true,
             manualActionType: "resume",
             blockingReasonCode: null,
@@ -589,7 +589,7 @@ export class FlowService {
               `## Final result\n\n- Implementation: ${workItem.implementationSummary ?? "n/a"}\n- Verification: ${workItem.testSummary ?? "n/a"}`,
             );
           }
-          this.context.store.saveEvidence(flow.id, {
+          await this.context.store.saveEvidence(flow.id, {
             id: randomUUID(),
             flowRunId: flow.id,
             stageName: "confluence_result_updating",
@@ -619,7 +619,7 @@ export class FlowService {
           return { outcome: "continue", nextStage: "completed" };
         }
         case "completed":
-          this.transitionTo(flow, "completed", "completed", {
+          await this.transitionTo(flow, "completed", "completed", {
             manualActionRequired: false,
             manualActionType: null,
             blockingReasonCode: null,
@@ -643,15 +643,15 @@ export class FlowService {
         flow.blockingReasonCode = error.code;
         flow.blockingReasonMessage = error.message;
         flow.updatedAt = nowIso();
-        this.context.store.saveFlow(flow);
-        this.log(flow.id, flow.currentStage, "error", "stage_failed", error.message, error.details ?? {});
+        await this.context.store.saveFlow(flow);
+        await this.logAsync(flow.id, flow.currentStage, "error", "stage_failed", error.message, error.details ?? {});
         return { outcome: "stop" };
       }
       throw error;
     }
   }
 
-  private startStageRun(flow: FlowRun): StageRun {
+  private async startStageRun(flow: FlowRun): Promise<StageRun> {
     const now = nowIso();
     const existing = this.context.store
       .listStageRuns(flow.id)
@@ -673,10 +673,10 @@ export class FlowService {
       leaseExpiresAt: new Date(Date.now() + 30_000).toISOString(),
       lastHeartbeatAt: now,
     };
-    this.context.store.saveStageRun(flow.id, stageRun);
+    await this.context.store.saveStageRun(flow.id, stageRun);
     flow.overallStatus = "running";
     flow.updatedAt = now;
-    this.context.store.saveFlow(flow);
+    await this.context.store.saveFlow(flow);
     return stageRun;
   }
 
@@ -787,15 +787,15 @@ export class FlowService {
     return workItem;
   }
 
-  private log(
+  private async logAsync(
     flowRunId: string,
     stageName: StageName,
     level: "debug" | "info" | "warn" | "error",
     eventType: string,
     message: string,
     details: Record<string, unknown>,
-  ) {
-    this.context.store.saveLog(flowRunId, {
+  ): Promise<void> {
+    await this.context.store.saveLog(flowRunId, {
       id: randomUUID(),
       flowRunId,
       stageName,
@@ -807,8 +807,19 @@ export class FlowService {
       relatedObjectId: null,
       createdAt: nowIso(),
       redacted: true,
-    }).catch((err: unknown) => {
-      // Fire-and-forget: log failures must not crash the server
+    });
+  }
+
+  private log(
+    flowRunId: string,
+    stageName: StageName,
+    level: "debug" | "info" | "warn" | "error",
+    eventType: string,
+    message: string,
+    details: Record<string, unknown>,
+  ): void {
+    // Fire-and-forget wrapper for places where we can't await
+    this.logAsync(flowRunId, stageName, level, eventType, message, details).catch((err: unknown) => {
       console.error("Failed to save flow log:", err);
     });
   }
