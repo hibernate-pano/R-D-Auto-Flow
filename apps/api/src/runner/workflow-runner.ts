@@ -15,6 +15,7 @@ import type { FlowStore } from "../types.js";
 import type { RuntimeContext } from "../types.js";
 import type { FlowRun, StageRun } from "@rdaf/domain";
 import { nowIso } from "@rdaf/domain";
+import { createLogger } from "../telemetry/logger.js";
 
 const LEASE_TIMEOUT_MS = 30_000; // 30 seconds
 const HEARTBEAT_INTERVAL_MS = 10_000; // every 10 seconds
@@ -23,6 +24,7 @@ const STALE_GRACE_MS = 5_000; // extra time after lease expiry before marking st
 
 export class WorkflowRunner {
   private readonly store: FlowStore;
+  private readonly log = createLogger("workflow-runner");
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
@@ -97,7 +99,7 @@ export class WorkflowRunner {
           updatedAt: nowIso(),
         };
         await this.store.saveFlowAsync(updatedFlow);
-        console.warn(`[runner] recovered stale stage ${sr.stageName} on flow ${flow.id}`);
+        this.log.warn({ flowId: flow.id, stageName: sr.stageName }, "recovered stale stage");
       }
     }
   }
@@ -139,7 +141,7 @@ export class WorkflowRunner {
     try {
       await this.pickUpRunnableFlow();
     } catch (err) {
-      console.error("[runner] poll error:", err);
+      this.log.error({ err }, "poll error");
     }
 
     if (!this.stopped) {

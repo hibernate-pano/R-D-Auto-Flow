@@ -24,6 +24,9 @@ import {
 } from "@rdaf/domain";
 import type { RuntimeConfig } from "@rdaf/config-contract";
 import type { AutoStageHandlerResult, FlowDetailPayload, FlowPrecheckPayload, RuntimeContext } from "./types.js";
+import { createLogger } from "./telemetry/logger.js";
+
+const log = createLogger("flow-service");
 
 const jiraKeyPattern = /^[A-Z][A-Z0-9]+-\d+$/;
 
@@ -844,7 +847,7 @@ export class FlowService {
   ): void {
     // Fire-and-forget wrapper for places where we can't await
     this.logAsync(flowRunId, stageName, level, eventType, message, details).catch((err: unknown) => {
-      console.error("Failed to save flow log:", err);
+      log.error({ err, flowRunId, stageName }, "Failed to save flow log");
     });
   }
 }

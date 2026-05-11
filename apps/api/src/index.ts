@@ -1,3 +1,6 @@
+// Initialize OpenTelemetry BEFORE any other imports so auto-instrumentation covers everything.
+import "./telemetry/sdk.js";
+
 import { buildServer } from "./server.js";
 
 const cwd = process.cwd();
