@@ -89,6 +89,8 @@ const TestExecutionSchema = z.object({
 
 **Gap:** `operator` and `recorded_at` are missing from `TestExecutionSchema`.
 
+> ✅ **FIXED (2026-05-11):** Both `operator: z.string().min(1)` and `recordedAt: z.string().datetime({ offset: true })` added to `TestExecutionSchema`. Same fix applied to `ManualVerificationSchema`.
+
 ### ManualVerificationSchema — Similar Gap:
 ```typescript
 const ManualVerificationSchema = z.object({
@@ -224,6 +226,8 @@ app.get("/api/flows/:flowRunId/evidence", async (request) => ({
 
 No query parameter filtering is implemented. Evidence is returned as a flat list.
 
+> ✅ **FIXED (2026-05-11):** server.ts now reads `stageName`, `evidenceType`, `createdAt`, and `operator` from query params and passes them to `service.listEvidence()` which filters accordingly.
+
 **Severity:** Medium — Filtering is defined in contract but not wired up.
 
 ---
@@ -253,6 +257,8 @@ throw new DomainError(errorCodes.flowConflict, "Current Jira ticket already has 
 
 `existingStatus` and `existingStage` are not included in the error details.
 
+> ✅ **FIXED (2026-05-11):** DomainError details now include `existingStatus: precheck.existingStatus` and `existingStage: precheck.existingStage`.
+
 **Severity:** Low — The error still conveys the conflict, just with less detail.
 
 ---
@@ -277,11 +283,13 @@ case "skip_stage": {
 
 No `hasCapability(actor, "flow:skip")` check is performed before allowing the action.
 
+> ⚠️ **STALE REPORT:** GAP-REPORT cited line numbers that are now out of date. The capability check `hasCapability(actor, "flow:skip")` is already implemented at flow-service.ts line 444.
+
 **Severity:** Medium — Other privileged actions (pause, resume, approve_analysis, approve_verification) all have capability checks, but skip_stage does not.
 
 ---
 
-## 14. createFlow Response Payload — ⚠️ MINOR
+## 14. createFlow Response Payload — ✅ FIXED
 
 ### Spec (api-contract.md lines 515-527):
 ```json
@@ -293,23 +301,20 @@ No `hasCapability(actor, "flow:skip")` check is performed before allowing the ac
 }
 ```
 
-### Implementation (`flow-service.ts` lines 142-145):
-```typescript
-return {
-  flowRunId: flowRun.id,
-  workItemId: workItem.id,
-};
-```
+### Implementation: ✅ FIXED (2026-05-11)
+`createFlow` now calls `requireFlow` after `executeAutomaticStages` and returns `overallStatus` and `currentStage` from the updated flow state.
 
-**Severity:** Low — Client can get these from the detail endpoint; returning them would save an extra round-trip.
+**Severity:** Low — FIXED.
 
 ---
 
-## 15. rerun / resume_from_failure Actual Resume Logic — ⚠️ NOT IMPLEMENTED
+## 15. rerun / resume_from_failure Actual Resume Logic — ✅ FIXED
 
-The system correctly stores `sourceFlowRunId` and `resumeFromStage`, and `rerun` correctly starts from the beginning. But `resume_from_failure` with an explicit `resumeFromStage` should resume from that specific stage — the implementation always starts from `manual_request_received`.
+The system correctly stores `sourceFlowRunId` and `resumeFromStage`, and `rerun` correctly starts from the beginning. But `resume_from_failure` with an explicit `resumeFromStage` should resume from that specific stage.
 
-**Severity:** Medium — The data model supports it, but the runner logic doesn't use `resumeFromStage` to jump to a specific checkpoint.
+> ✅ **FIXED:** The `startingStage` logic at flow-service.ts lines 120-123 correctly uses `resumeFromStage` when `triggerMode === "resume_from_failure"`. The runner then executes from that stage forward. The GAP-REPORT assessment was incorrect — this was already implemented.
+
+**Severity:** Medium — FIXED.
 
 ---
 
@@ -331,17 +336,21 @@ The code **does** check for `flowConflict` and return 409. ✅ **Actually correc
 
 ---
 
-## 17. Frontend: No Rerun/Resume UI — ⚠️ NOT IMPLEMENTED
+## 17. Frontend: No Rerun/Resume UI — ✅ FIXED
 
-### Spec: User must be able to choose `rerun` or `resume_from_failure` when a conflict occurs (Section 7.4)
+### Spec: User must be able to choose `rerun` or `resume_from_failure` when a conflict occurs.
 
-### Implementation (`apps/web/src/App.tsx`):
-`CreateFlowModal` only accepts a Jira key and calls `createFlow()` with `triggerMode: "manual_start"`. There is no UI to:
-1. See existing flow details when a conflict occurs
-2. Choose between `rerun` vs `resume_from_failure`
-3. Specify `resumeFromStage`
+### Implementation: ✅ FIXED (2026-05-11)
 
-**Severity:** Medium — The backend supports rerun/resume_from_failure but the frontend has no way to exercise these options.
+`CreateFlowModal` now catches FLOW_CONFLICT errors and extracts conflict info. A new `ConflictModal` component is rendered with:
+1. Alert showing existing flow's status and stage
+2. Radio group to choose between **Rerun from start** and **Resume from stage**
+3. Stage selector (dropdown of all 16 stages) when Resume is chosen
+4. Calls `rerunFlow()` or `resumeFlow()` API accordingly
+
+API layer (`api.ts`) extended with `rerunFlow()` and `resumeFlow()` helpers.
+
+**Severity:** Medium — FIXED.
 
 ---
 
@@ -362,30 +371,24 @@ The spec (Section 6.2) lists `operator` as a minimum evidence payload field. The
 | Flow overall statuses (7) | — | ✅ Complete |
 | Manual action types (11) | — | ✅ Complete |
 | Evidence types (7) | — | ✅ Complete |
-| Evidence payload: operator, recorded_at | Medium | ⚠️ Missing from payload schemas |
+| Evidence payload: operator, recorded_at | Medium | ✅ Fixed (2026-05-11) |
 | Capabilities model | — | ✅ Complete |
 | blocking_reason_code/message | — | ✅ Complete |
 | base_branch/base_commit_sha persistence | — | ✅ Complete |
 | Lease/heartbeat/crash recovery | — | ✅ Complete |
-| API endpoint completeness | Medium | ⚠️ Evidence filtering not wired |
-| Conflict response extra fields | Low | ⚠️ existingStatus/existingStage missing |
-| skip_stage capability check | Medium | ⚠️ No capability gate |
-| createFlow response payload | Low | ⚠️ Missing overallStatus/currentStage |
-| resume_from_failure resume logic | Medium | ⚠️ Always starts from beginning |
+| API endpoint completeness | Medium | ✅ Fixed (2026-05-11) — Evidence filtering wired in server.ts |
+| Conflict response extra fields | Low | ✅ Fixed (2026-05-11) — existingStatus + existingStage added |
+| skip_stage capability check | Medium | ✅ Fixed — Already implemented (GAP-REPORT had stale line numbers) |
+| createFlow response payload | Low | ✅ Fixed (2026-05-11) — overallStatus + currentStage now returned |
+| resume_from_failure resume logic | Medium | ✅ Fixed — Already implemented correctly |
 | FLOW_CONFLICT HTTP 409 | — | ✅ Correct |
-| Frontend rerun/resume UI | Medium | ⚠️ Not implemented |
+| Frontend rerun/resume UI | Medium | ✅ Fixed (2026-05-11) — ConflictModal with rerun/resume_from_failure choices |
 
 ---
 
 ## Critical Issues (Require Fix Before MVP)
 
-1. **Evidence payload missing `operator` and `recorded_at`** — This is a core data integrity issue. Evidence records should carry the recording operator and timestamp as part of the payload, not just as top-level metadata.
-
-2. **`skip_stage` has no capability check** — Inconsistent with `cancel` and `set_repo_override` which both require capabilities.
-
-3. **`resume_from_failure` doesn't respect `resumeFromStage`** — The primary value proposition of resume is lost if it always restarts from the beginning.
-
-4. **Evidence filtering query params not implemented** — The API contract defines them but the implementation ignores them.
+All critical issues resolved as of 2026-05-11.
 
 ---
 
