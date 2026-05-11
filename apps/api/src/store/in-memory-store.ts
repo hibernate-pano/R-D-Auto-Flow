@@ -162,6 +162,11 @@ export class InMemoryFlowStore implements FlowStore {
     return Promise.resolve();
   }
 
+  saveWorkItemAsync(workItem: WorkItem): Promise<void> {
+    this.saveWorkItem(workItem);
+    return Promise.resolve();
+  }
+
   saveManualActionAsync(
     flowRunId: string,
     action: {

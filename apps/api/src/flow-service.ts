@@ -232,7 +232,7 @@ export class FlowService {
     if (payload.evidenceType === "implementation_note") {
       workItem.implementationSummary = (parsedPayload as { summary: string }).summary;
       workItem.updatedAt = nowIso();
-      this.context.store.saveWorkItem(workItem);
+      await this.context.store.saveWorkItemAsync(workItem);
       if (flow.currentStage === "implementation_waiting") {
         await this.transitionTo(flow, "verification_waiting", "waiting_manual_action", {
           manualActionRequired: true,
@@ -249,7 +249,7 @@ export class FlowService {
           ? (parsedPayload as { summary: string }).summary
           : (parsedPayload as { conclusion: string }).conclusion;
       workItem.updatedAt = nowIso();
-      this.context.store.saveWorkItem(workItem);
+      await this.context.store.saveWorkItemAsync(workItem);
       if (flow.currentStage === "verification_waiting") {
         if (this.context.config.workflow.requireVerificationApproval) {
           await this.transitionTo(flow, "verification_approval_waiting", "waiting_manual_action", {
@@ -300,7 +300,7 @@ export class FlowService {
         flow.overallStatus = "paused";
         flow.updatedAt = nowIso();
         flow.manualActionRequired = true;
-        this.context.store.saveFlow(flow);
+        await this.context.store.saveFlowAsync(flow);
         break;
       case "resume":
         if (!hasCapability(actor, "flow:resume")) {
@@ -311,7 +311,7 @@ export class FlowService {
           flow.manualActionRequired = false;
           flow.blockingReasonCode = null;
           flow.blockingReasonMessage = null;
-          this.context.store.saveFlow(flow);
+          await this.context.store.saveFlowAsync(flow);
           await this.executeAutomaticStages(flow.id);
         }
         break;
@@ -319,14 +319,14 @@ export class FlowService {
         flow.overallStatus = "cancelled";
         flow.completedAt = nowIso();
         flow.updatedAt = flow.completedAt;
-        this.context.store.saveFlow(flow);
+        await this.context.store.saveFlowAsync(flow);
         break;
       case "retry_stage":
         flow.overallStatus = "running";
         flow.manualActionRequired = false;
         flow.blockingReasonCode = null;
         flow.blockingReasonMessage = null;
-        this.context.store.saveFlow(flow);
+        await this.context.store.saveFlowAsync(flow);
         await this.executeAutomaticStages(flow.id);
         break;
       case "set_repo_override":
@@ -341,7 +341,7 @@ export class FlowService {
           : [];
         workItem.sourceConfluenceUrls = urls;
         workItem.updatedAt = nowIso();
-        this.context.store.saveWorkItem(workItem);
+        await this.context.store.saveWorkItemAsync(workItem);
         await this.transitionTo(flow, "source_pages_fetching", "running");
         await this.executeAutomaticStages(flow.id);
         break;

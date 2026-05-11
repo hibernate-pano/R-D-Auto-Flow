@@ -119,6 +119,7 @@ export interface FlowStore {
   saveStageRunAsync(flowRunId: string, stageRun: StageRun): Promise<void>;
   saveLogAsync(flowRunId: string, log: FlowLog): Promise<void>;
   saveEvidenceAsync(flowRunId: string, evidence: EvidenceRecord): Promise<void>;
+  saveWorkItemAsync(workItem: WorkItem): Promise<void>;
   saveManualActionAsync(flowRunId: string, action: {
     id: string;
     flowRunId: string;
