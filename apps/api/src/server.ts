@@ -201,11 +201,30 @@ export async function buildServer(cwd: string) {
     meta: {},
   }));
 
-  app.get("/api/flows/:flowRunId/evidence", async (request) => ({
-    success: true,
-    data: { items: service.listEvidence((request.params as { flowRunId: string }).flowRunId) },
-    meta: {},
-  }));
+  app.get("/api/flows/:flowRunId/evidence", async (request) => {
+    const { flowRunId } = request.params as { flowRunId: string };
+    const q = request.query as Record<string, string | undefined>;
+    const filters: {
+      stageName?: string;
+      evidenceType?: string;
+      createdAt?: string;
+      operator?: string;
+    } = {};
+    if (q.stageName) filters.stageName = q.stageName;
+    if (q.evidenceType) filters.evidenceType = q.evidenceType;
+    if (q.createdAt) filters.createdAt = q.createdAt;
+    if (q.operator) filters.operator = q.operator;
+    return {
+      success: true,
+      data: {
+        items: service.listEvidence(
+          flowRunId,
+          Object.keys(filters).length > 0 ? filters : undefined,
+        ),
+      },
+      meta: {},
+    };
+  });
 
   app.post("/api/flows/:flowRunId/evidence", async (request) => {
     const actor = buildActorFromHeaders(request.headers as Record<string, unknown>);

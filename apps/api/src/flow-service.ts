@@ -67,6 +67,8 @@ export class FlowService {
       baseBranch: repoMapping?.baseBranch ?? null,
       hasRunningFlow: Boolean(activeFlow),
       existingFlowRunId: activeFlow?.id ?? null,
+      existingStatus: activeFlow?.overallStatus ?? null,
+      existingStage: activeFlow?.currentStage ?? null,
       message: activeFlow
         ? `Active flow ${activeFlow.id} already exists for ${jiraKey}`
         : `Ready to create flow for ${jiraKey}`,
@@ -81,6 +83,8 @@ export class FlowService {
       throw new DomainError(errorCodes.flowConflict, "Current Jira ticket already has an active flow", {
         jiraKey: payload.jiraKey,
         flowRunId: precheck.existingFlowRunId,
+        existingStatus: precheck.existingStatus,
+        existingStage: precheck.existingStage,
       });
     }
 
@@ -113,11 +117,16 @@ export class FlowService {
 
     await this.context.store.saveWorkItem(workItem);
 
+    const startingStage: StageName =
+      payload.triggerMode === "resume_from_failure" && payload.resumeFromStage
+        ? (payload.resumeFromStage as StageName)
+        : "manual_request_received";
+
     const flowRun: FlowRun = {
       id: randomUUID(),
       workItemId: workItem.id,
       triggerMode: payload.triggerMode,
-      currentStage: "manual_request_received",
+      currentStage: startingStage,
       overallStatus: "pending",
       blockingReasonCode: null,
       blockingReasonMessage: null,
@@ -139,9 +148,12 @@ export class FlowService {
     });
     await this.executeAutomaticStages(flowRun.id);
 
+    const updatedFlow = this.requireFlow(flowRun.id);
     return {
       flowRunId: flowRun.id,
       workItemId: workItem.id,
+      overallStatus: updatedFlow.overallStatus,
+      currentStage: updatedFlow.currentStage,
     };
   }
 
@@ -187,9 +199,30 @@ export class FlowService {
     return this.context.store.listLogs(flowRunId);
   }
 
-  listEvidence(flowRunId: string) {
+  listEvidence(
+    flowRunId: string,
+    filters?: {
+      stageName?: string;
+      evidenceType?: string;
+      createdAt?: string;
+      operator?: string;
+    },
+  ) {
     this.requireFlow(flowRunId);
-    return this.context.store.listEvidence(flowRunId);
+    let items = this.context.store.listEvidence(flowRunId);
+    if (filters?.stageName) {
+      items = items.filter((e) => e.stageName === filters.stageName);
+    }
+    if (filters?.evidenceType) {
+      items = items.filter((e) => e.evidenceType === filters.evidenceType);
+    }
+    if (filters?.createdAt) {
+      items = items.filter((e) => e.createdAt === filters.createdAt);
+    }
+    if (filters?.operator) {
+      items = items.filter((e) => e.actor.operatorId === filters.operator);
+    }
+    return items;
   }
 
   availableActionsForFlow(flowRunId: string) {
@@ -268,7 +301,12 @@ export class FlowService {
       }
     }
 
-    return { evidenceId: evidence.id, flowRunId };
+    return {
+      evidenceId: evidence.id,
+      flowRunId,
+      operator: actor.operatorId,
+      recordedAt: evidence.createdAt,
+    };
   }
 
   async submitAction(flowRunId: string, input: ManualActionInput, actor: ActorSnapshot = defaultDevActor) {
@@ -408,6 +446,9 @@ export class FlowService {
         });
         break;
       case "skip_stage": {
+        if (!hasCapability(actor, "flow:skip")) {
+          throw new DomainError(errorCodes.actionNotAllowed, "Skip capability missing");
+        }
         const target = nextStage(flow.currentStage);
         if (!target) {
           throw new DomainError(errorCodes.actionNotAllowed, "Cannot skip final stage");

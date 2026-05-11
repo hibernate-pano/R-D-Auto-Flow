@@ -134,6 +134,8 @@ export const TestExecutionSchema = z.object({
   artifacts: z.array(z.string()).default([]),
   coverageNote: z.string().min(1),
   riskNote: z.string().min(1),
+  operator: z.string().min(1),
+  recordedAt: z.string().datetime({ offset: true }),
 });
 
 export const ManualVerificationSchema = z.object({
@@ -141,6 +143,8 @@ export const ManualVerificationSchema = z.object({
   scope: z.string().min(1),
   riskNote: z.string().min(1),
   noAutomationReason: z.string().min(1),
+  operator: z.string().min(1),
+  recordedAt: z.string().datetime({ offset: true }),
 });
 
 export const ApprovalDecisionSchema = z.object({
@@ -309,6 +313,8 @@ export const PrecheckResultSchema = z.object({
   baseBranch: z.string().nullable(),
   hasRunningFlow: z.boolean(),
   existingFlowRunId: z.string().nullable(),
+  existingStatus: z.string().nullable(),
+  existingStage: z.string().nullable(),
 });
 
 export type PrecheckResult = z.infer<typeof PrecheckResultSchema>;

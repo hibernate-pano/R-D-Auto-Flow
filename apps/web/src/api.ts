@@ -39,17 +39,62 @@ export async function fetchAvailableActions(flowRunId: string) {
 }
 
 export async function createFlow(jiraKey: string) {
-  return request<{ flowRunId: string; workItemId: string }>("/api/flows", {
-    method: "POST",
-    body: JSON.stringify({
-      jiraKey,
-      triggerMode: "manual_start",
-      repoOverride: null,
-      note: "created from web",
-      sourceFlowRunId: null,
-      resumeFromStage: null,
-    }),
-  });
+  return request<{ flowRunId: string; workItemId: string; overallStatus: string; currentStage: string }>(
+    "/api/flows",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        jiraKey,
+        triggerMode: "manual_start",
+        repoOverride: null,
+        note: "created from web",
+        sourceFlowRunId: null,
+        resumeFromStage: null,
+      }),
+    },
+  );
+}
+
+export async function rerunFlow(opts: {
+  jiraKey: string;
+  sourceFlowRunId: string;
+  resumeFromStage: string;
+}) {
+  return request<{ flowRunId: string; workItemId: string; overallStatus: string; currentStage: string }>(
+    "/api/flows",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        jiraKey: opts.jiraKey,
+        triggerMode: "rerun",
+        repoOverride: null,
+        note: "rerun from web",
+        sourceFlowRunId: opts.sourceFlowRunId,
+        resumeFromStage: opts.resumeFromStage,
+      }),
+    },
+  );
+}
+
+export async function resumeFlow(opts: {
+  jiraKey: string;
+  sourceFlowRunId: string;
+  resumeFromStage: string;
+}) {
+  return request<{ flowRunId: string; workItemId: string; overallStatus: string; currentStage: string }>(
+    "/api/flows",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        jiraKey: opts.jiraKey,
+        triggerMode: "resume_from_failure",
+        repoOverride: null,
+        note: "resume from web",
+        sourceFlowRunId: opts.sourceFlowRunId,
+        resumeFromStage: opts.resumeFromStage,
+      }),
+    },
+  );
 }
 
 export async function precheckFlow(jiraKey: string) {

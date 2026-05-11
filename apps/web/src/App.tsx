@@ -5,6 +5,8 @@ import {
   fetchFlowDetail,
   fetchFlows,
   precheckFlow,
+  rerunFlow,
+  resumeFlow,
   submitAction,
 } from "./api.js";
 import type { TableColumnsType } from "antd";
@@ -18,6 +20,8 @@ import {
   Layout,
   message,
   Modal,
+  Radio,
+  Select,
   Space,
   Table,
   Tag,
@@ -297,16 +301,140 @@ function FlowDetailPanel({
   );
 }
 
+// ── ConflictModal ─────────────────────────────────────────────────────────────
+
+type ConflictInfo = {
+  jiraKey: string;
+  flowRunId: string;
+  existingStatus: string;
+  existingStage: string;
+};
+
+function ConflictModal({
+  open,
+  conflict,
+  onClose,
+  onChosen,
+}: {
+  open: boolean;
+  conflict: ConflictInfo | null;
+  onClose: () => void;
+  onChosen: (flowRunId: string) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<"rerun" | "resume">("rerun");
+  const [chosenStage, setChosenStage] = useState<string>("manual_request_received");
+
+  async function handleOk() {
+    if (!conflict) return;
+    setLoading(true);
+    try {
+      const created =
+        mode === "rerun"
+          ? await rerunFlow({
+              jiraKey: conflict.jiraKey,
+              sourceFlowRunId: conflict.flowRunId,
+              resumeFromStage: "manual_request_received",
+            })
+          : await resumeFlow({
+              jiraKey: conflict.jiraKey,
+              sourceFlowRunId: conflict.flowRunId,
+              resumeFromStage: chosenStage,
+            });
+      onChosen(created.flowRunId);
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Modal
+      title="Active Flow Conflict"
+      open={open}
+      onOk={handleOk}
+      onCancel={onClose}
+      confirmLoading={loading}
+      okText={mode === "rerun" ? "Rerun from Start" : "Resume from Stage"}
+    >
+      {conflict && (
+        <Space direction="vertical" style={{ width: "100%" }} size="middle">
+          <Alert
+            message={`Jira ticket ${conflict.jiraKey} already has an active flow`}
+            description={
+              <span>
+                Status: <strong>{conflict.existingStatus}</strong> | Stage:{" "}
+                <strong>{conflict.existingStage.replace(/_/g, " ")}</strong>
+              </span>
+            }
+            type="warning"
+            showIcon
+          />
+          <div>
+            <Text>Choose recovery mode:</Text>
+            <div style={{ marginTop: 8 }}>
+              <Radio.Group
+                value={mode}
+                onChange={(e) => setMode(e.target.value as "rerun" | "resume")}
+              >
+                <Space direction="vertical">
+                  <Radio value="rerun">
+                    <Text>
+                      <strong>Rerun from start</strong> — restart from manual_request_received, will
+                      re-fetch Jira ticket
+                    </Text>
+                  </Radio>
+                  <Radio value="resume">
+                    <Text>
+                      <strong>Resume from stage</strong> — continue from where it left off
+                    </Text>
+                  </Radio>
+                </Space>
+              </Radio.Group>
+            </div>
+          </div>
+          {mode === "resume" && (
+            <div>
+              <Text>Resume from stage:</Text>
+              <Select
+                value={chosenStage}
+                onChange={setChosenStage}
+                style={{ width: "100%", marginTop: 4 }}
+              >
+                <Select.Option value="manual_request_received">
+                  manual_request_received
+                </Select.Option>
+                <Select.Option value="jira_ticket_fetching">jira_ticket_fetching</Select.Option>
+                <Select.Option value="jira_ticket_normalized">jira_ticket_normalized</Select.Option>
+                <Select.Option value="confluence_links_extracting">
+                  confluence_links_extracting
+                </Select.Option>
+                <Select.Option value="source_pages_fetching">source_pages_fetching</Select.Option>
+                <Select.Option value="analysis_generating">analysis_generating</Select.Option>
+                <Select.Option value="analysis_page_creating">analysis_page_creating</Select.Option>
+                <Select.Option value="repo_resolving">repo_resolving</Select.Option>
+                <Select.Option value="branch_preparing">branch_preparing</Select.Option>
+              </Select>
+            </div>
+          )}
+        </Space>
+      )}
+    </Modal>
+  );
+}
+
 // ── CreateFlowModal ──────────────────────────────────────────────────────────
 
 function CreateFlowModal({
   open,
   onClose,
   onCreated,
+  onConflict,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated: (flowRunId: string) => void;
+  onConflict: (info: ConflictInfo) => void;
 }) {
   const [jiraKey, setJiraKey] = useState("");
   const [loading, setLoading] = useState(false);
@@ -323,7 +451,25 @@ function CreateFlowModal({
       setJiraKey("");
       onCreated(created.flowRunId);
     } catch (err) {
-      setPrecheckMsg(err instanceof Error ? err.message : "Failed");
+      const msg = err instanceof Error ? err.message : "Failed";
+      if (
+        msg.includes("already has an active flow") ||
+        msg.includes("FLOW_CONFLICT")
+      ) {
+        const precheck = await precheckFlow(jiraKey.trim().toUpperCase()).catch(() => null);
+        if (precheck) {
+          const p = precheck as Record<string, unknown>;
+          setLoading(false);
+          onConflict({
+            jiraKey: jiraKey.trim().toUpperCase(),
+            flowRunId: String(p.existingFlowRunId ?? ""),
+            existingStatus: String(p.existingStatus ?? "unknown"),
+            existingStage: String(p.existingStage ?? "unknown"),
+          });
+          return;
+        }
+      }
+      setPrecheckMsg(msg);
     } finally {
       setLoading(false);
     }
@@ -370,6 +516,8 @@ export function App() {
   const [availableActions, setAvailableActions] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [conflictModalOpen, setConflictModalOpen] = useState(false);
+  const [conflictInfo, setConflictInfo] = useState<ConflictInfo | null>(null);
   const [messageApi, contextHolder] = message.useMessage();
 
   async function refreshFlows(selected?: string | null) {
@@ -397,6 +545,17 @@ export function App() {
   async function handleCreateFlow() {
     setCreateModalOpen(false);
     await refreshFlows();
+  }
+
+  function handleConflict(info: ConflictInfo) {
+    setConflictInfo(info);
+    setConflictModalOpen(true);
+  }
+
+  async function handleConflictChosen(flowRunId: string) {
+    setConflictModalOpen(false);
+    setConflictInfo(null);
+    await refreshFlows(flowRunId);
   }
 
   async function handleAction(actionType: string) {
@@ -463,6 +622,13 @@ export function App() {
         open={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         onCreated={handleCreateFlow}
+        onConflict={handleConflict}
+      />
+      <ConflictModal
+        open={conflictModalOpen}
+        conflict={conflictInfo}
+        onClose={() => setConflictModalOpen(false)}
+        onChosen={handleConflictChosen}
       />
     </AntdApp>
   );
