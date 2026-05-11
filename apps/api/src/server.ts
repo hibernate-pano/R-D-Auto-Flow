@@ -19,6 +19,7 @@ import { RealConfluenceConnector } from "./connectors/real-confluence-connector.
 import { RealGithubConnector } from "./connectors/real-github-connector.js";
 import { RealLlmConnector } from "./connectors/real-llm-connector.js";
 import { FlowService } from "./flow-service.js";
+import { WorkflowRunner } from "./runner/workflow-runner.js";
 import { InMemoryFlowStore } from "./store/in-memory-store.js";
 import { PgFlowStore } from "./store/pg/pg-flow-store.js";
 import type { FlowStore } from "./types.js";
@@ -102,6 +103,19 @@ export async function buildServer(cwd: string) {
     github,
     llm,
   });
+
+  // Start the persistent WorkflowRunner (lease/heartbeat/crash-recovery).
+  // Shares the same FlowService instance via a shared RuntimeContext.
+  const runner = new WorkflowRunner({
+    store: store as FlowStore,
+    jira,
+    confluence,
+    github,
+    llm,
+    config,
+    env,
+  });
+  runner.start();
 
   app.log.info({ summary }, "runtime config loaded");
 
