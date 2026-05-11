@@ -162,7 +162,7 @@ export class FlowService {
       return true;
     }
 
-    this.transitionTo(this.requireFlow(flowRunId), result.nextStage, "running");
+    await this.transitionTo(this.requireFlow(flowRunId), result.nextStage, "running");
     return true;
   }
 
@@ -234,7 +234,7 @@ export class FlowService {
       workItem.updatedAt = nowIso();
       this.context.store.saveWorkItem(workItem);
       if (flow.currentStage === "implementation_waiting") {
-        this.transitionTo(flow, "verification_waiting", "waiting_manual_action", {
+        await this.transitionTo(flow, "verification_waiting", "waiting_manual_action", {
           manualActionRequired: true,
           manualActionType: "resume",
           blockingReasonCode: null,
@@ -252,14 +252,14 @@ export class FlowService {
       this.context.store.saveWorkItem(workItem);
       if (flow.currentStage === "verification_waiting") {
         if (this.context.config.workflow.requireVerificationApproval) {
-          this.transitionTo(flow, "verification_approval_waiting", "waiting_manual_action", {
+          await this.transitionTo(flow, "verification_approval_waiting", "waiting_manual_action", {
             manualActionRequired: true,
             manualActionType: "approve_verification",
             blockingReasonCode: null,
             blockingReasonMessage: "Verification evidence recorded. Approval required.",
           });
         } else {
-          this.transitionTo(flow, "confluence_result_updating", "running");
+          await this.transitionTo(flow, "confluence_result_updating", "running");
           await this.executeAutomaticStages(flow.id);
         }
       }
@@ -331,7 +331,7 @@ export class FlowService {
         break;
       case "set_repo_override":
         flow.repoOverride = String(action.payload.repoName ?? action.payload.repoOverride ?? "");
-        this.transitionTo(flow, "repo_resolving", "running");
+        await this.transitionTo(flow, "repo_resolving", "running");
         await this.executeAutomaticStages(flow.id);
         break;
       case "set_confluence_links": {
@@ -342,7 +342,7 @@ export class FlowService {
         workItem.sourceConfluenceUrls = urls;
         workItem.updatedAt = nowIso();
         this.context.store.saveWorkItem(workItem);
-        this.transitionTo(flow, "source_pages_fetching", "running");
+        await this.transitionTo(flow, "source_pages_fetching", "running");
         await this.executeAutomaticStages(flow.id);
         break;
       }
@@ -364,11 +364,11 @@ export class FlowService {
           sourceSystem: "operator",
           createdAt: nowIso(),
         });
-        this.transitionTo(flow, "repo_resolving", "running");
+        await this.transitionTo(flow, "repo_resolving", "running");
         await this.executeAutomaticStages(flow.id);
         break;
       case "request_analysis_changes":
-        this.transitionTo(flow, "analysis_approval_waiting", "waiting_manual_action", {
+        await this.transitionTo(flow, "analysis_approval_waiting", "waiting_manual_action", {
           manualActionRequired: true,
           manualActionType: "approve_analysis",
           blockingReasonCode: "ANALYSIS_CHANGES_REQUESTED",
@@ -393,11 +393,11 @@ export class FlowService {
           sourceSystem: "operator",
           createdAt: nowIso(),
         });
-        this.transitionTo(flow, "confluence_result_updating", "running");
+        await this.transitionTo(flow, "confluence_result_updating", "running");
         await this.executeAutomaticStages(flow.id);
         break;
       case "request_verification_changes":
-        this.transitionTo(flow, "verification_waiting", "waiting_manual_action", {
+        await this.transitionTo(flow, "verification_waiting", "waiting_manual_action", {
           manualActionRequired: true,
           manualActionType: "resume",
           blockingReasonCode: "VERIFICATION_CHANGES_REQUESTED",
@@ -409,7 +409,7 @@ export class FlowService {
         if (!target) {
           throw new DomainError(errorCodes.actionNotAllowed, "Cannot skip final stage");
         }
-        this.transitionTo(flow, target, "running");
+        await this.transitionTo(flow, target, "running");
         await this.executeAutomaticStages(flow.id);
         break;
       }
@@ -436,7 +436,7 @@ export class FlowService {
       if (result.outcome === "stop") {
         return;
       }
-      this.transitionTo(flow, result.nextStage, "running");
+      await this.transitionTo(flow, result.nextStage, "running");
     }
   }
 
@@ -447,11 +447,11 @@ export class FlowService {
     try {
       switch (flow.currentStage) {
         case "manual_request_received":
-          this.finishStageRun(flow.id, stageRun, "succeeded");
+          await this.finishStageRun(flow.id, stageRun, "succeeded");
           return { outcome: "continue", nextStage: "jira_ticket_fetching" };
         case "jira_ticket_fetching":
           this.requireWorkItem(flow.workItemId);
-          this.finishStageRun(flow.id, stageRun, "succeeded");
+          await this.finishStageRun(flow.id, stageRun, "succeeded");
           return { outcome: "continue", nextStage: "jira_ticket_normalized" };
         case "jira_ticket_normalized": {
           const workItem = this.requireWorkItem(flow.workItemId);
@@ -463,7 +463,7 @@ export class FlowService {
           workItem.assignee = ticket.assignee;
           workItem.updatedAt = nowIso();
           await this.context.store.saveWorkItem(workItem);
-          this.finishStageRun(flow.id, stageRun, "succeeded");
+          await this.finishStageRun(flow.id, stageRun, "succeeded");
           return { outcome: "continue", nextStage: "confluence_links_extracting" };
         }
         case "confluence_links_extracting": {
@@ -474,7 +474,7 @@ export class FlowService {
           workItem.sourceConfluenceUrls = urls;
           workItem.updatedAt = nowIso();
           await this.context.store.saveWorkItem(workItem);
-          this.finishStageRun(flow.id, stageRun, "succeeded");
+          await this.finishStageRun(flow.id, stageRun, "succeeded");
           return { outcome: "continue", nextStage: "source_pages_fetching" };
         }
         case "source_pages_fetching": {
@@ -486,7 +486,7 @@ export class FlowService {
           workItem.sourceConfluenceDigest = digests;
           workItem.updatedAt = nowIso();
           await this.context.store.saveWorkItem(workItem);
-          this.finishStageRun(flow.id, stageRun, "succeeded");
+          await this.finishStageRun(flow.id, stageRun, "succeeded");
           return { outcome: "continue", nextStage: "analysis_generating" };
         }
         case "analysis_generating": {
@@ -506,7 +506,7 @@ export class FlowService {
             sourceSystem: "system",
             createdAt: nowIso(),
           });
-          this.finishStageRun(flow.id, stageRun, "succeeded");
+          await this.finishStageRun(flow.id, stageRun, "succeeded");
           return { outcome: "continue", nextStage: "analysis_page_creating" };
         }
         case "analysis_page_creating": {
@@ -535,7 +535,7 @@ export class FlowService {
           workItem.analysisPageUrl = page.pageUrl;
           workItem.updatedAt = nowIso();
           await this.context.store.saveWorkItem(workItem);
-          this.finishStageRun(flow.id, stageRun, "succeeded");
+          await this.finishStageRun(flow.id, stageRun, "succeeded");
           await this.transitionTo(flow, "analysis_approval_waiting", "waiting_manual_action", {
             manualActionRequired: true,
             manualActionType: "approve_analysis",
@@ -557,7 +557,7 @@ export class FlowService {
           workItem.baseBranch = repoMapping.baseBranch;
           workItem.updatedAt = nowIso();
           await this.context.store.saveWorkItem(workItem);
-          this.finishStageRun(flow.id, stageRun, "succeeded");
+          await this.finishStageRun(flow.id, stageRun, "succeeded");
           return { outcome: "continue", nextStage: "branch_preparing" };
         }
         case "branch_preparing": {
@@ -596,7 +596,7 @@ export class FlowService {
               `## Branch snapshot\n\n- Repo: ${prepared.repoName}\n- Base branch: ${prepared.baseBranch}\n- Base commit: ${prepared.baseCommitSha}\n- Working branch: ${prepared.workingBranch}`,
             );
           }
-          this.finishStageRun(flow.id, stageRun, "succeeded");
+          await this.finishStageRun(flow.id, stageRun, "succeeded");
           await this.transitionTo(flow, "implementation_waiting", "waiting_manual_action", {
             manualActionRequired: true,
             manualActionType: "resume",
@@ -627,7 +627,7 @@ export class FlowService {
             sourceSystem: "system",
             createdAt: nowIso(),
           });
-          this.finishStageRun(flow.id, stageRun, "succeeded");
+          await this.finishStageRun(flow.id, stageRun, "succeeded");
           return { outcome: "continue", nextStage: "jira_status_updating" };
         }
         case "jira_status_updating": {
@@ -639,7 +639,7 @@ export class FlowService {
             });
           }
           await this.context.jira.transitionTicket(workItem.jiraKey, doneStatus);
-          this.finishStageRun(flow.id, stageRun, "succeeded");
+          await this.finishStageRun(flow.id, stageRun, "succeeded");
           return { outcome: "continue", nextStage: "completed" };
         }
         case "completed":
@@ -655,12 +655,12 @@ export class FlowService {
         case "implementation_waiting":
         case "verification_waiting":
         case "verification_approval_waiting":
-          this.finishStageRun(flow.id, stageRun, "waiting_manual_action");
+          await this.finishStageRun(flow.id, stageRun, "waiting_manual_action");
           return { outcome: "stop" };
       }
     } catch (error) {
       if (error instanceof DomainError) {
-        this.finishStageRun(flow.id, stageRun, "failed", error.code, error.message);
+        await this.finishStageRun(flow.id, stageRun, "failed", error.code, error.message);
         flow.overallStatus = "waiting_manual_action";
         flow.manualActionRequired = true;
         flow.manualActionType = flow.currentStage === "repo_resolving" ? "set_repo_override" : "retry_stage";
@@ -704,13 +704,13 @@ export class FlowService {
     return stageRun;
   }
 
-  private finishStageRun(
+  private async finishStageRun(
     flowRunId: string,
     stageRun: StageRun,
     status: StageRun["status"],
     errorCode: string | null = null,
     errorMessage: string | null = null,
-  ) {
+  ): Promise<void> {
     const finishedAt = nowIso();
     const updated: StageRun = {
       ...stageRun,
@@ -723,10 +723,10 @@ export class FlowService {
       leaseExpiresAt: null,
       lastHeartbeatAt: finishedAt,
     };
-    this.context.store.saveStageRun(flowRunId, updated);
+    await this.context.store.saveStageRunAsync(flowRunId, updated);
   }
 
-  private transitionTo(
+  private async transitionTo(
     flow: FlowRun,
     next: StageName,
     overallStatus: FlowRun["overallStatus"],
@@ -737,7 +737,7 @@ export class FlowService {
       blockingReasonMessage?: string | null;
       completedAt?: string | null;
     },
-  ) {
+  ): Promise<void> {
     flow.currentStage = next;
     flow.overallStatus = overallStatus;
     flow.manualActionRequired = overrides?.manualActionRequired ?? false;
@@ -748,7 +748,7 @@ export class FlowService {
     if (overrides?.completedAt !== undefined) {
       flow.completedAt = overrides.completedAt;
     }
-    this.context.store.saveFlow(flow);
+    await this.context.store.saveFlowAsync(flow);
   }
 
   private availableActions(flow: FlowRun): ManualActionType[] {
