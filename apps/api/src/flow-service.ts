@@ -142,6 +142,30 @@ export class FlowService {
     };
   }
 
+  /**
+   * Advance a flow by executing one automatic stage.
+   * Called by the persistent WorkflowRunner after a manual action unblocks a flow.
+   * Returns true if the flow was advanced, false if nothing to do.
+   */
+  async executeStageForRunner(flowRunId: string): Promise<boolean> {
+    const flow = this.requireFlow(flowRunId);
+    if (
+      flow.overallStatus !== "running" ||
+      flow.manualActionRequired ||
+      flow.currentStage === "completed"
+    ) {
+      return false;
+    }
+
+    const result = await this.runCurrentStage(flow);
+    if (result.outcome === "stop") {
+      return true;
+    }
+
+    this.transitionTo(this.requireFlow(flowRunId), result.nextStage, "running");
+    return true;
+  }
+
   getFlowDetail(flowRunId: string): FlowDetailPayload {
     const flowRun = this.requireFlow(flowRunId);
     const workItem = this.requireWorkItem(flowRun.workItemId);

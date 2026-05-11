@@ -110,6 +110,25 @@ export interface FlowStore {
     createdAt: string;
   }): void;
   findActiveFlowByJiraKey(jiraKey: string): FlowRun | undefined;
+
+  // Async variants — required by the persistent WorkflowRunner
+  listFlowsAsync(): Promise<FlowRun[]>;
+  getFlowAsync(flowRunId: string): Promise<FlowRun | undefined>;
+  saveFlowAsync(flowRun: FlowRun): Promise<void>;
+  listStageRunsAsync(flowRunId: string): Promise<StageRun[]>;
+  saveStageRunAsync(flowRunId: string, stageRun: StageRun): Promise<void>;
+  saveLogAsync(flowRunId: string, log: FlowLog): Promise<void>;
+  saveEvidenceAsync(flowRunId: string, evidence: EvidenceRecord): Promise<void>;
+  saveManualActionAsync(flowRunId: string, action: {
+    id: string;
+    flowRunId: string;
+    actionType: ManualActionInput["actionType"];
+    payload: Record<string, unknown>;
+    note: string;
+    actor: ActorSnapshot;
+    result: "accepted" | "rejected" | "applied" | "failed";
+    createdAt: string;
+  }): Promise<void>;
 }
 
 export interface RuntimeContext {

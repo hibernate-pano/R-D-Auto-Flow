@@ -128,4 +128,54 @@ export class InMemoryFlowStore implements FlowStore {
       );
     });
   }
+
+  // ── Async variants (passthrough to sync for in-memory store) ─────────────────
+
+  listFlowsAsync(): Promise<FlowRun[]> {
+    return Promise.resolve(this.listFlows());
+  }
+
+  getFlowAsync(flowRunId: string): Promise<FlowRun | undefined> {
+    return Promise.resolve(this.getFlow(flowRunId));
+  }
+
+  saveFlowAsync(flowRun: FlowRun): Promise<void> {
+    this.saveFlow(flowRun);
+    return Promise.resolve();
+  }
+
+  listStageRunsAsync(flowRunId: string): Promise<StageRun[]> {
+    return Promise.resolve(this.listStageRuns(flowRunId));
+  }
+
+  saveStageRunAsync(flowRunId: string, stageRun: StageRun): Promise<void> {
+    this.saveStageRun(flowRunId, stageRun);
+    return Promise.resolve();
+  }
+
+  saveLogAsync(flowRunId: string, log: FlowLog): Promise<void> {
+    return this.saveLog(flowRunId, log);
+  }
+
+  saveEvidenceAsync(flowRunId: string, evidence: EvidenceRecord): Promise<void> {
+    this.saveEvidence(flowRunId, evidence);
+    return Promise.resolve();
+  }
+
+  saveManualActionAsync(
+    flowRunId: string,
+    action: {
+      id: string;
+      flowRunId: string;
+      actionType: ManualActionInput["actionType"];
+      payload: Record<string, unknown>;
+      note: string;
+      actor: ActorSnapshot;
+      result: "accepted" | "rejected" | "applied" | "failed";
+      createdAt: string;
+    },
+  ): Promise<void> {
+    this.saveManualAction(flowRunId, action);
+    return Promise.resolve();
+  }
 }
