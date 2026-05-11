@@ -153,9 +153,13 @@ export class PgFlowStore {
     return this._getFlow?.get(flowRunId);
   }
   saveFlow(flowRun: FlowRun): void {
-    this._saveFlow = Promise.resolve(this.db.insertInto("flow_runs").values(toFlowRunRow(flowRun))
-      .onConflict(oc => oc.column("id").doUpdateSet(toFlowRunRow(flowRun)))
-      .executeTakeFirstOrThrow());
+    this._saveFlow = (async () => {
+      // Await the insert so the row exists in PG before child records
+      // (logs, stage_runs) are inserted by executeAutomaticStages.
+      await this.db.insertInto("flow_runs").values(toFlowRunRow(flowRun))
+        .onConflict(oc => oc.column("id").doUpdateSet(toFlowRunRow(flowRun)))
+        .executeTakeFirstOrThrow();
+    })();
     // Keep sync cache in sync for read-after-write
     if (!this._getFlow) this._getFlow = new Map();
     this._getFlow.set(flowRun.id, flowRun);
@@ -172,9 +176,12 @@ export class PgFlowStore {
     return this._getWorkItemByJiraKey?.get(jiraKey);
   }
   saveWorkItem(workItem: WorkItem): void {
-    this._saveWorkItem = Promise.resolve(this.db.insertInto("work_items").values(toWorkItemRow(workItem))
-      .onConflict(oc => oc.column("id").doUpdateSet(toWorkItemRow(workItem)))
-      .executeTakeFirstOrThrow());
+    this._saveWorkItem = (async () => {
+      // Await so the work_item row exists before saveFlow (which has a FK to it).
+      await this.db.insertInto("work_items").values(toWorkItemRow(workItem))
+        .onConflict(oc => oc.column("id").doUpdateSet(toWorkItemRow(workItem)))
+        .executeTakeFirstOrThrow();
+    })();
   }
   listStageRuns(flowRunId: string): StageRun[] {
     return this._listStageRuns?.get(flowRunId) ?? [];
