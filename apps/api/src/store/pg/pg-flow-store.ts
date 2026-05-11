@@ -64,7 +64,7 @@ interface FlowRunRow {
   operator_id: string;
   operator_email: string;
   operator_display_name: string;
-  operator_capabilities_json: unknown;
+  operator_capabilities_json: string;
   source_flow_run_id: string | null;
   resume_from_stage: string | null;
   repo_override: string | null;
@@ -115,7 +115,7 @@ interface ManualActionRow {
   operator_id: string;
   operator_email: string;
   operator_display_name: string;
-  operator_capabilities_json: unknown;
+  operator_capabilities_json: string;
   result: string;
   created_at: string;
 }
@@ -456,7 +456,12 @@ function toFlowRun(r: FlowRunRow): FlowRun {
       operatorId: r.operator_id,
       operatorEmail: r.operator_email,
       operatorDisplayName: r.operator_display_name,
-      operatorCapabilities: r.operator_capabilities_json as ActorSnapshot["operatorCapabilities"],
+      operatorCapabilities: ((): ActorSnapshot["operatorCapabilities"] => {
+        const raw = r.operator_capabilities_json;
+        if (Array.isArray(raw)) return raw as ActorSnapshot["operatorCapabilities"];
+        try { return JSON.parse(raw as string) as ActorSnapshot["operatorCapabilities"]; }
+        catch { return (raw as string).replace(/^\{?ARRAY\[|\]"?\}?$/g, '').split(',').map(s => s.trim().replace(/^['"]|['"]$/g, '')) as ActorSnapshot["operatorCapabilities"]; }
+      })(),
     },
     startedAt: tsToString(r.started_at)!,
     updatedAt: tsToString(r.updated_at)!,
@@ -528,7 +533,12 @@ function toManualAction(r: ManualActionRow) {
       operatorId: r.operator_id,
       operatorEmail: r.operator_email,
       operatorDisplayName: r.operator_display_name,
-      operatorCapabilities: r.operator_capabilities_json as ActorSnapshot["operatorCapabilities"],
+      operatorCapabilities: ((): ActorSnapshot["operatorCapabilities"] => {
+        const raw = r.operator_capabilities_json;
+        if (Array.isArray(raw)) return raw as ActorSnapshot["operatorCapabilities"];
+        try { return JSON.parse(raw as string) as ActorSnapshot["operatorCapabilities"]; }
+        catch { return (raw as string).replace(/^\{?ARRAY\[|\]"?\}?$/g, '').split(',').map(s => s.trim().replace(/^['"]|['"]$/g, '')) as ActorSnapshot["operatorCapabilities"]; }
+      })(),
     },
     result: r.result as "accepted" | "rejected" | "applied" | "failed",
     createdAt: tsToString(r.created_at)!,
